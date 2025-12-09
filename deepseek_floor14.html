@@ -1,0 +1,3174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Plan Navigator - Desktop & Mobile</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .app {
+            width: 100vw;
+            height: 100vh;
+            background-color: #f3f4f6;
+            display: flex;
+        }
+        .sidebar {
+            width: 320px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* Added for step counter positioning */
+        }
+        .canvas-container {
+            background: white;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            overflow: auto;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        canvas {
+            display: block;
+            max-width: none;
+            max-height: none;
+            transition: transform 0.2s ease;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0.375rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:hover {
+            background: #f3f4f6;
+        }
+        .zoom-level {
+            min-width: 60px;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .btn-warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+        .btn-info {
+            background-color: #06b6d4;
+            color: white;
+        }
+        .btn-info:hover {
+            background-color: #0891b2;
+        }
+        .mode-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .mode-btn.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .mode-btn.train.active {
+            background-color: #10b981;
+        }
+        .mode-btn.navigate.active {
+            background-color: #ef4444;
+        }
+        .mode-btn.disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .section {
+            margin-bottom: 1.5rem;
+        }
+        .path-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            background-color: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .path-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .path-item:hover {
+            background-color: #e5e7eb;
+        }
+        .path-item.active {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+        }
+        .path-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .path-action-btn {
+            padding: 0.25rem;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scroll-container {
+            max-height: 160px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.25rem;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+        }
+        .training-panel, .navigation-panel {
+            background-color: #ecfdf5;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #a7f3d0;
+            margin-bottom: 1rem;
+        }
+        .navigation-panel {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+        }
+        .edit-path-panel {
+            background-color: #fef7cd;
+            border: 2px solid #f59e0b;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .add-location-panel {
+            background-color: #eff6ff;
+            border: 2px solid #93c5fd;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .login-panel {
+            background-color: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .admin-indicator {
+            background-color: #10b981;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        .instruction-text {
+            font-size: 0.875rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .distance-indicator {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-success {
+            background-color: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-error {
+            background-color: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .instructions-panel {
+            background-color: #fffbeb;
+            border: 2px solid #fcd34d;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .instruction-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
+        }
+        .instruction-number {
+            background: #3b82f6;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .instruction-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .instruction-actions {
+            display: flex;
+            gap: 0.25rem;
+            flex-shrink: 0;
+        }
+        .instruction-edit-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .instruction-edit-btn:hover {
+            background: #4b5563;
+        }
+        .instruction-delete-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .instruction-delete-btn:hover {
+            background: #dc2626;
+        }
+        .add-instruction-btn {
+            width: 100%;
+            padding: 0.5rem;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .add-instruction-btn:hover {
+            background: #059669;
+        }
+        .edit-instruction-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px solid #3b82f6;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .upload-area {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem;
+        }
+        
+        /* Motion & Simulation styles */
+        .motion-panel, .simulation-panel {
+            background-color: #f5f3ff;
+            border: 2px solid #8b5cf6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .simulation-panel {
+            background-color: #fffbeb;
+            border-color: #f59e0b;
+        }
+        .status-indicator {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status-simulation {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-inactive {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        .status-on-path {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .status-off-path {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .data-item {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+        }
+        .data-label {
+            font-size: 0.625rem;
+            color: #6b7280;
+            margin-bottom: 0.125rem;
+        }
+        .data-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .step-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            color: white;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .step-count {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .direction-display {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .control-btn {
+            padding: 0.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn:hover {
+            background: #2563eb;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn.up { grid-column: 2; grid-row: 1; }
+        .control-btn.down { grid-column: 2; grid-row: 3; }
+        .control-btn.left { grid-column: 1; grid-row: 2; }
+        .control-btn.right { grid-column: 3; grid-row: 2; }
+        .control-btn.center { grid-column: 2; grid-row: 2; background: #6b7280; }
+        
+        .flex {
+            display: flex;
+        }
+        .gap-2 {
+            gap: 0.5rem;
+        }
+        .gap-1 {
+            gap: 0.25rem;
+        }
+        .w-full {
+            width: 100%;
+        }
+        .flex-1 {
+            flex: 1;
+        }
+        .justify-between {
+            justify-content: space-between;
+        }
+        .items-center {
+            align-items: center;
+        }
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+        .p-2 {
+            padding: 0.5rem;
+        }
+        .p-3 {
+            padding: 0.75rem;
+        }
+        .p-4 {
+            padding: 1rem;
+        }
+        .px-2 {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        .px-3 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .py-1 {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+        .rounded {
+            border-radius: 0.375rem;
+        }
+        .bg-gray-100 {
+            background-color: #f3f4f6;
+        }
+        .bg-gray-200 {
+            background-color: #e5e7eb;
+        }
+        .bg-blue-50 {
+            background-color: #eff6ff;
+        }
+        .bg-blue-500 {
+            background-color: #3b82f6;
+        }
+        .bg-green-50 {
+            background-color: #ecfdf5;
+        }
+        .bg-green-500 {
+            background-color: #10b981;
+        }
+        .bg-red-50 {
+            background-color: #fef2f2;
+        }
+        .bg-red-500 {
+            background-color: #ef4444;
+        }
+        .bg-purple-500 {
+            background-color: #8b5cf6;
+        }
+        .bg-purple-600 {
+            background-color: #7c3aed;
+        }
+        .bg-yellow-50 {
+            background-color: #fffbeb;
+        }
+        .bg-yellow-500 {
+            background-color: #f59e0b;
+        }
+        .text-white {
+            color: white;
+        }
+        .text-gray-600 {
+            color: #4b5563;
+        }
+        .text-gray-800 {
+            color: #1f2937;
+        }
+        .border {
+            border: 1px solid #d1d5db;
+        }
+        .border-2 {
+            border-width: 2px;
+        }
+        .border-blue-300 {
+            border-color: #93c5fd;
+        }
+        .cursor-crosshair {
+            cursor: crosshair;
+        }
+        .cursor-default {
+            cursor: default;
+        }
+        .cursor-grab {
+            cursor: grab;
+        }
+        .cursor-grabbing {
+            cursor: grabbing;
+        }
+        .hidden {
+            display: none;
+        }
+        
+        /* Path tracking styles */
+        .path-progress {
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+        .path-progress-fill {
+            height: 100%;
+            background-color: #10b981;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .path-deviation {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
+        }
+        .deviation-low {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .deviation-medium {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .deviation-high {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Step Counter Display */
+        .step-counter-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 0.5rem;
+            border: 2px solid #3b82f6;
+            padding: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            min-width: 200px;
+        }
+        .step-counter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .step-counter-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .step-counter-badge {
+            background: #3b82f6;
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .step-counter-value {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        .step-counter-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .step-counter-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .step-counter-stat {
+            background: #f3f4f6;
+            padding: 0.375rem;
+            border-radius: 0.25rem;
+            text-align: center;
+        }
+        .step-counter-stat-label {
+            color: #6b7280;
+            margin-bottom: 0.125rem;
+        }
+        .step-counter-stat-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .step-animation {
+            animation: stepPulse 0.3s ease;
+        }
+        @keyframes stepPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Simple icon replacements */
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+        .icon-upload::before { content: "📤"; }
+        .icon-save::before { content: "💾"; }
+        .icon-navigation::before { content: "🧭"; }
+        .icon-trash::before { content: "🗑️"; }
+        .icon-pin::before { content: "📍"; }
+        .icon-play::before { content: "▶️"; }
+        .icon-zoom-in::before { content: "➕"; }
+        .icon-zoom-out::before { content: "➖"; }
+        .icon-reset::before { content: "🔄"; }
+        .icon-edit::before { content: "✏️"; }
+        .icon-add::before { content: "➕"; }
+        .icon-load::before { content: "📥"; }
+        .icon-login::before { content: "🔐"; }
+        .icon-logout::before { content: "🚪"; }
+        .icon-walk::before { content: "🚶"; }
+        .icon-motion::before { content: "📱"; }
+        .icon-step::before { content: "👣"; }
+        .icon-keyboard::before { content: "⌨️"; }
+        .icon-mouse::before { content: "🖱️"; }
+        .icon-arrow-up::before { content: "⬆️"; }
+        .icon-arrow-down::before { content: "⬇️"; }
+        .icon-arrow-left::before { content: "⬅️"; }
+        .icon-arrow-right::before { content: "➡️"; }
+        .icon-click::before { content: "👆"; }
+        .icon-path::before { content: "🛤️"; }
+        .icon-target::before { content: "🎯"; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // Simple icon components
+        const UploadIcon = () => React.createElement('span', { className: 'icon icon-upload' });
+        const SaveIcon = () => React.createElement('span', { className: 'icon icon-save' });
+        const NavigationIcon = () => React.createElement('span', { className: 'icon icon-navigation' });
+        const TrashIcon = () => React.createElement('span', { className: 'icon icon-trash' });
+        const PinIcon = () => React.createElement('span', { className: 'icon icon-pin' });
+        const PlayIcon = () => React.createElement('span', { className: 'icon icon-play' });
+        const ZoomInIcon = () => React.createElement('span', { className: 'icon icon-zoom-in' });
+        const ZoomOutIcon = () => React.createElement('span', { className: 'icon icon-zoom-out' });
+        const ResetZoomIcon = () => React.createElement('span', { className: 'icon icon-reset' });
+        const EditIcon = () => React.createElement('span', { className: 'icon icon-edit' });
+        const AddIcon = () => React.createElement('span', { className: 'icon icon-add' });
+        const LoadIcon = () => React.createElement('span', { className: 'icon icon-load' });
+        const LoginIcon = () => React.createElement('span', { className: 'icon icon-login' });
+        const LogoutIcon = () => React.createElement('span', { className: 'icon icon-logout' });
+        const WalkIcon = () => React.createElement('span', { className: 'icon icon-walk' });
+        const MotionIcon = () => React.createElement('span', { className: 'icon icon-motion' });
+        const StepIcon = () => React.createElement('span', { className: 'icon icon-step' });
+        const KeyboardIcon = () => React.createElement('span', { className: 'icon icon-keyboard' });
+        const MouseIcon = () => React.createElement('span', { className: 'icon icon-mouse' });
+        const ArrowUpIcon = () => React.createElement('span', { className: 'icon icon-arrow-up' });
+        const ArrowDownIcon = () => React.createElement('span', { className: 'icon icon-arrow-down' });
+        const ArrowLeftIcon = () => React.createElement('span', { className: 'icon icon-arrow-left' });
+        const ArrowRightIcon = () => React.createElement('span', { className: 'icon icon-arrow-right' });
+        const ClickIcon = () => React.createElement('span', { className: 'icon icon-click' });
+        const PathIcon = () => React.createElement('span', { className: 'icon icon-path' });
+        const TargetIcon = () => React.createElement('span', { className: 'icon icon-target' });
+
+        const FloorPlanNavigator = () => {
+            const [floorPlan, setFloorPlan] = useState(null);
+            const [mode, setMode] = useState('navigate');
+            const [locations, setLocations] = useState([]);
+            const [paths, setPaths] = useState([]);
+            const [currentPath, setCurrentPath] = useState([]);
+            const [trainingFrom, setTrainingFrom] = useState('');
+            const [trainingTo, setTrainingTo] = useState('');
+            const [navigateFrom, setNavigateFrom] = useState('');
+            const [navigateTo, setNavigateTo] = useState('');
+            const [activePath, setActivePath] = useState(null);
+            const [isNavigating, setIsNavigating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [addingLocation, setAddingLocation] = useState(false);
+            const [newLocationName, setNewLocationName] = useState('');
+            const [pendingLocation, setPendingLocation] = useState(null);
+            
+            // Zoom and pan state
+            const [zoom, setZoom] = useState(1);
+            const [offset, setOffset] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            
+            // Instruction editing state
+            const [instructions, setInstructions] = useState([]);
+            const [editingInstructionIndex, setEditingInstructionIndex] = useState(null);
+            const [editingInstructionText, setEditingInstructionText] = useState('');
+            const [newInstructionText, setNewInstructionText] = useState('');
+            
+            // Path editing state
+            const [editingPathIndex, setEditingPathIndex] = useState(null);
+            const [selectedPathIndex, setSelectedPathIndex] = useState(null);
+            
+            // Admin authentication state
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            
+            // === MOTION TRACKING STATE ===
+            const [isMotionTracking, setIsMotionTracking] = useState(false);
+            const [isSimulationMode, setIsSimulationMode] = useState(false);
+            const [stepCount, setStepCount] = useState(0);
+            const [currentDirection, setCurrentDirection] = useState('N');
+            const [stepLength, setStepLength] = useState(50);
+            const [currentPosition, setCurrentPosition] = useState(null);
+            const [isMotionAvailable, setIsMotionAvailable] = useState(false);
+            const [deviceType, setDeviceType] = useState('desktop');
+            const [isClickToMove, setIsClickToMove] = useState(false);
+            const [motionData, setMotionData] = useState({
+                acceleration: { x: 0, y: 0, z: 0 },
+                rotation: { alpha: 0, beta: 0, gamma: 0 },
+                lastStepTime: 0
+            });
+            
+            // === PATH TRACKING STATE ===
+            const [pathProgress, setPathProgress] = useState(0); // 0-100%
+            const [distanceTravelled, setDistanceTravelled] = useState(0);
+            const [totalPathDistance, setTotalPathDistance] = useState(0);
+            const [isOnPath, setIsOnPath] = useState(true);
+            const [pathDeviation, setPathDeviation] = useState(0); // in pixels
+            const [nextWaypoint, setNextWaypoint] = useState(0);
+            const [closestSegment, setClosestSegment] = useState(0);
+            const [pathTrackingHistory, setPathTrackingHistory] = useState([]);
+            
+            // === STEP COUNTER ANIMATION ===
+            const [stepAnimation, setStepAnimation] = useState(false);
+            const [stepsPerMinute, setStepsPerMinute] = useState(0);
+            const [lastStepTimestamp, setLastStepTimestamp] = useState(Date.now());
+            const [stepHistory, setStepHistory] = useState([]);
+            
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const lastAccelerationRef = useRef({ x: 0, y: 0, z: 0 });
+            const lastStepTimeRef = useRef(0);
+            const stepCooldownRef = useRef(300); // ms between steps
+            const motionListenersRef = useRef({ motion: null, orientation: null });
+            const lastPositionRef = useRef(null);
+            const pathCheckIntervalRef = useRef(null);
+            const stepCounterRef = useRef(null);
+            const stepTimerRef = useRef(null);
+
+            // Admin credentials
+            const ADMIN_CREDENTIALS = {
+                username: 'admin',
+                password: 'admin123'
+            };
+
+            // Simple localStorage wrapper
+            const storage = {
+                set(key, value) {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return Promise.resolve({ value });
+                },
+                get(key) {
+                    try {
+                        const value = localStorage.getItem(key);
+                        return Promise.resolve(value ? { value: JSON.parse(value) } : null);
+                    } catch (error) {
+                        return Promise.resolve(null);
+                    }
+                }
+            };
+
+            // Detect device type and capabilities on mount
+            useEffect(() => {
+                detectDeviceType();
+                checkMotionAvailability();
+                loadData();
+                
+                // Check if admin was previously logged in
+                const savedAdmin = localStorage.getItem('nav-admin');
+                if (savedAdmin) {
+                    setIsAdmin(true);
+                }
+                
+                // Set up global key listeners for simulation
+                const handleKeyDownGlobal = (e) => {
+                    if (isNavigating && isSimulationMode && !e.target.matches('input, textarea, select')) {
+                        handleSimulationKey(e);
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyDownGlobal);
+                return () => window.removeEventListener('keydown', handleKeyDownGlobal);
+            }, []);
+
+            // Debug navigation state
+            useEffect(() => {
+                console.log('Navigation Debug:', {
+                    navigateFrom,
+                    navigateTo,
+                    pathsCount: paths.length,
+                    paths: paths,
+                    locations: locations
+                });
+            }, [navigateFrom, navigateTo, paths, locations]);
+
+            // Cleanup motion listeners on unmount
+            useEffect(() => {
+                return () => {
+                    stopMotionTracking();
+                    stopPathTracking();
+                    if (stepTimerRef.current) {
+                        clearInterval(stepTimerRef.current);
+                    }
+                };
+            }, []);
+
+            // Update position based on steps AND track path
+            useEffect(() => {
+                if (isNavigating && (isMotionTracking || isSimulationMode) && stepCount > 0) {
+                    updatePositionFromSteps();
+                }
+            }, [stepCount, currentDirection]);
+
+            // Update canvas when position changes
+            useEffect(() => {
+                drawCanvas();
+            }, [floorPlan, locations, currentPath, activePath, isNavigating, currentStep, 
+                pendingLocation, zoom, offset, currentPosition, currentDirection, 
+                isMotionTracking, isSimulationMode, pathProgress, isOnPath]);
+
+            // Track path when position changes
+            useEffect(() => {
+                if (currentPosition && activePath && isNavigating) {
+                    trackPathPosition(currentPosition);
+                    
+                    // Add to history
+                    setPathTrackingHistory(prev => {
+                        const newHistory = [...prev, {
+                            position: { ...currentPosition },
+                            timestamp: Date.now(),
+                            stepCount,
+                            pathProgress,
+                            isOnPath
+                        }];
+                        // Keep only last 100 positions
+                        return newHistory.slice(-100);
+                    });
+                }
+            }, [currentPosition]);
+
+            // Start/stop path tracking interval
+            useEffect(() => {
+                if (isNavigating && activePath) {
+                    startPathTracking();
+                } else {
+                    stopPathTracking();
+                }
+                
+                return () => {
+                    stopPathTracking();
+                };
+            }, [isNavigating, activePath]);
+
+            // Calculate steps per minute
+            useEffect(() => {
+                if (isNavigating && (isMotionTracking || isSimulationMode)) {
+                    startStepTimer();
+                } else {
+                    stopStepTimer();
+                }
+                
+                return () => {
+                    stopStepTimer();
+                };
+            }, [isNavigating, isMotionTracking, isSimulationMode]);
+
+            const detectDeviceType = () => {
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isMobile = /mobile|iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(userAgent);
+                const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
+                
+                if (isMobile && !isTablet) {
+                    setDeviceType('mobile');
+                } else if (isTablet) {
+                    setDeviceType('tablet');
+                } else {
+                    setDeviceType('desktop');
+                }
+                
+                console.log('Device detected:', deviceType);
+            };
+
+            const checkMotionAvailability = () => {
+                const hasDeviceMotion = 'DeviceMotionEvent' in window;
+                const hasDeviceOrientation = 'DeviceOrientationEvent' in window;
+                
+                console.log('Device Motion API available:', hasDeviceMotion);
+                console.log('Device Orientation API available:', hasDeviceOrientation);
+                
+                if (hasDeviceMotion && hasDeviceOrientation) {
+                    // Try to listen for motion events to confirm availability
+                    const testMotionHandler = (event) => {
+                        if (event.acceleration || event.accelerationIncludingGravity) {
+                            setIsMotionAvailable(true);
+                            console.log('Motion sensors confirmed working');
+                            window.removeEventListener('devicemotion', testMotionHandler);
+                        }
+                    };
+                    
+                    window.addEventListener('devicemotion', testMotionHandler);
+                    
+                    setTimeout(() => {
+                        window.removeEventListener('devicemotion', testMotionHandler);
+                        if (!isMotionAvailable) {
+                            console.log('Motion sensors not responding, assuming unavailable');
+                        }
+                    }, 2000);
+                } else {
+                    setIsMotionAvailable(false);
+                }
+            };
+
+            const loadData = async () => {
+                try {
+                    const [locData, pathData, planData] = await Promise.all([
+                        storage.get('nav-locations'),
+                        storage.get('nav-paths'),
+                        storage.get('nav-floorplan')
+                    ]);
+
+                    if (locData?.value) {
+                        setLocations(locData.value);
+                        console.log('Loaded locations:', locData.value);
+                    }
+                    
+                    if (pathData?.value) {
+                        setPaths(pathData.value);
+                        console.log('Loaded paths:', pathData.value);
+                    }
+                    
+                    if (planData?.value) {
+                        setFloorPlan(planData.value);
+                        console.log('Loaded floor plan');
+                    }
+                    
+                    // Log for debugging
+                    console.log('Total paths loaded:', pathData?.value?.length || 0);
+                    console.log('Total locations loaded:', locData?.value?.length || 0);
+                    
+                } catch (error) {
+                    console.log('No saved data found or error loading:', error);
+                }
+            };
+
+            const saveData = async () => {
+                try {
+                    await Promise.all([
+                        storage.set('nav-locations', locations),
+                        storage.set('nav-paths', paths),
+                        floorPlan && storage.set('nav-floorplan', floorPlan)
+                    ]);
+                    alert('Data saved successfully!');
+                } catch (error) {
+                    alert('Error saving data: ' + error.message);
+                }
+            };
+
+            // =============================================
+            // PATH TRACKING FUNCTIONS
+            // =============================================
+            
+            const startPathTracking = () => {
+                if (!activePath) return;
+                
+                // Calculate total path distance
+                const totalDist = calculatePathDistance(activePath.path);
+                setTotalPathDistance(totalDist);
+                setDistanceTravelled(0);
+                setPathProgress(0);
+                setNextWaypoint(1);
+                setClosestSegment(0);
+                setIsOnPath(true);
+                setPathDeviation(0);
+                setPathTrackingHistory([]);
+                
+                console.log('Path tracking started. Total distance:', totalDist);
+                
+                // Start checking path periodically
+                pathCheckIntervalRef.current = setInterval(() => {
+                    if (currentPosition && activePath) {
+                        checkPathDeviation(currentPosition);
+                    }
+                }, 1000); // Check every second
+            };
+            
+            const stopPathTracking = () => {
+                if (pathCheckIntervalRef.current) {
+                    clearInterval(pathCheckIntervalRef.current);
+                    pathCheckIntervalRef.current = null;
+                }
+            };
+            
+            const calculatePathDistance = (pathPoints) => {
+                if (!pathPoints || pathPoints.length < 2) return 0;
+                
+                let total = 0;
+                for (let i = 1; i < pathPoints.length; i++) {
+                    const dx = pathPoints[i].x - pathPoints[i-1].x;
+                    const dy = pathPoints[i].y - pathPoints[i-1].y;
+                    total += Math.sqrt(dx * dx + dy * dy);
+                }
+                return total;
+            };
+            
+            const trackPathPosition = (position) => {
+                if (!activePath || !position) return;
+                
+                // Find closest point on path
+                const { closestPoint, segmentIndex, distance } = findClosestPointOnPath(position, activePath.path);
+                
+                setClosestSegment(segmentIndex);
+                setPathDeviation(distance);
+                
+                // Check if we're on path (within tolerance)
+                const tolerance = stepLength * 3; // Allow 3 steps deviation
+                const onPath = distance <= tolerance;
+                setIsOnPath(onPath);
+                
+                if (!onPath && distance > tolerance * 2) {
+                    // Significantly off path - give warning
+                    speakInstruction("Warning: You are off the path. Please return to the marked route.");
+                    
+                    // Vibrate if available
+                    if ('vibrate' in navigator && deviceType !== 'desktop') {
+                        navigator.vibrate([100, 50, 100]);
+                    }
+                }
+                
+                // Calculate progress along path
+                let accumulatedDistance = 0;
+                for (let i = 0; i < segmentIndex; i++) {
+                    const dx = activePath.path[i+1].x - activePath.path[i].x;
+                    const dy = activePath.path[i+1].y - activePath.path[i].y;
+                    accumulatedDistance += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                // Add distance within current segment
+                const segmentStart = activePath.path[segmentIndex];
+                const segmentEnd = activePath.path[segmentIndex + 1];
+                if (segmentEnd) {
+                    const segmentVector = {
+                        x: segmentEnd.x - segmentStart.x,
+                        y: segmentEnd.y - segmentStart.y
+                    };
+                    const segmentLength = Math.sqrt(segmentVector.x * segmentVector.x + segmentVector.y * segmentVector.y);
+                    
+                    if (segmentLength > 0) {
+                        const toPointVector = {
+                            x: position.x - segmentStart.x,
+                            y: position.y - segmentStart.y
+                        };
+                        const projection = (toPointVector.x * segmentVector.x + toPointVector.y * segmentVector.y) / segmentLength;
+                        const clampedProjection = Math.max(0, Math.min(projection, segmentLength));
+                        
+                        accumulatedDistance += clampedProjection;
+                    }
+                }
+                
+                // Update progress
+                const progress = totalPathDistance > 0 ? (accumulatedDistance / totalPathDistance) * 100 : 0;
+                setPathProgress(progress);
+                setDistanceTravelled(accumulatedDistance);
+                
+                // Check if we've passed waypoints
+                if (segmentIndex >= nextWaypoint && nextWaypoint < activePath.instructions.length) {
+                    setNextWaypoint(prev => prev + 1);
+                    
+                    // Speak instruction for this waypoint
+                    if (nextWaypoint < activePath.instructions.length) {
+                        speakInstruction(activePath.instructions[nextWaypoint]);
+                    }
+                }
+                
+                // Check for arrival
+                const destination = activePath.path[activePath.path.length - 1];
+                const distanceToDestination = Math.sqrt(
+                    Math.pow(position.x - destination.x, 2) + 
+                    Math.pow(position.y - destination.y, 2)
+                );
+
+                if (distanceToDestination < stepLength * 2) {
+                    alert('🎉 You have arrived at your destination!');
+                    stopNavigation();
+                }
+            };
+            
+            const findClosestPointOnPath = (point, pathPoints) => {
+                if (!pathPoints || pathPoints.length < 2) {
+                    return { closestPoint: point, segmentIndex: 0, distance: 0 };
+                }
+                
+                let minDistance = Infinity;
+                let closestPoint = pathPoints[0];
+                let segmentIndex = 0;
+                
+                for (let i = 0; i < pathPoints.length - 1; i++) {
+                    const segmentStart = pathPoints[i];
+                    const segmentEnd = pathPoints[i + 1];
+                    
+                    const closest = getClosestPointOnSegment(point, segmentStart, segmentEnd);
+                    const distance = Math.sqrt(
+                        Math.pow(point.x - closest.x, 2) + 
+                        Math.pow(point.y - closest.y, 2)
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = closest;
+                        segmentIndex = i;
+                    }
+                }
+                
+                return { closestPoint, segmentIndex, distance: minDistance };
+            };
+            
+            const getClosestPointOnSegment = (point, segmentStart, segmentEnd) => {
+                const segmentVector = {
+                    x: segmentEnd.x - segmentStart.x,
+                    y: segmentEnd.y - segmentStart.y
+                };
+                const toPointVector = {
+                    x: point.x - segmentStart.x,
+                    y: point.y - segmentStart.y
+                };
+                
+                const segmentLengthSquared = segmentVector.x * segmentVector.x + segmentVector.y * segmentVector.y;
+                
+                if (segmentLengthSquared === 0) {
+                    return segmentStart; // Segment is a point
+                }
+                
+                // Project point onto segment
+                let t = (toPointVector.x * segmentVector.x + toPointVector.y * segmentVector.y) / segmentLengthSquared;
+                t = Math.max(0, Math.min(1, t)); // Clamp to segment
+                
+                return {
+                    x: segmentStart.x + t * segmentVector.x,
+                    y: segmentStart.y + t * segmentVector.y
+                };
+            };
+            
+            const checkPathDeviation = (position) => {
+                if (!activePath || !position) return;
+                
+                const { distance } = findClosestPointOnPath(position, activePath.path);
+                setPathDeviation(distance);
+                
+                const tolerance = stepLength * 3;
+                const wasOnPath = isOnPath;
+                const nowOnPath = distance <= tolerance;
+                
+                if (wasOnPath && !nowOnPath) {
+                    console.log('User went off path! Deviation:', distance);
+                    speakInstruction("You have gone off the path. Please turn back.");
+                    
+                    if ('vibrate' in navigator && deviceType !== 'desktop') {
+                        navigator.vibrate([200, 100, 200]);
+                    }
+                } else if (!wasOnPath && nowOnPath) {
+                    console.log('User returned to path!');
+                    speakInstruction("You are back on the path. Continue forward.");
+                }
+                
+                setIsOnPath(nowOnPath);
+            };
+            
+            const getDeviationLevel = (deviation) => {
+                if (deviation <= stepLength) return 'low';
+                if (deviation <= stepLength * 3) return 'medium';
+                return 'high';
+            };
+            
+            const getDeviationMessage = (deviation) => {
+                const level = getDeviationLevel(deviation);
+                const steps = Math.round(deviation / stepLength);
+                
+                switch(level) {
+                    case 'low':
+                        return `On track (${steps} steps off)`;
+                    case 'medium':
+                        return `Slightly off path (${steps} steps)`;
+                    case 'high':
+                        return `Significantly off path (${steps} steps)`;
+                    default:
+                        return `Deviation: ${Math.round(deviation)}px`;
+                }
+            };
+
+            // =============================================
+            // STEP COUNTER FUNCTIONS
+            // =============================================
+            
+            const startStepTimer = () => {
+                if (stepTimerRef.current) {
+                    clearInterval(stepTimerRef.current);
+                }
+                
+                stepTimerRef.current = setInterval(() => {
+                    calculateStepsPerMinute();
+                }, 5000); // Calculate every 5 seconds
+            };
+            
+            const stopStepTimer = () => {
+                if (stepTimerRef.current) {
+                    clearInterval(stepTimerRef.current);
+                    stepTimerRef.current = null;
+                }
+                setStepsPerMinute(0);
+            };
+            
+            const calculateStepsPerMinute = () => {
+                const now = Date.now();
+                const oneMinuteAgo = now - 60000; // 60 seconds in milliseconds
+                
+                // Count steps in the last minute
+                const recentSteps = stepHistory.filter(step => step.timestamp >= oneMinuteAgo);
+                const spm = recentSteps.length;
+                
+                setStepsPerMinute(spm);
+            };
+            
+            const detectStep = () => {
+                const newStepCount = stepCount + 1;
+                const now = Date.now();
+                
+                // Add to step history
+                setStepHistory(prev => {
+                    const newHistory = [...prev, { timestamp: now }];
+                    // Keep only steps from last 2 minutes
+                    return newHistory.filter(step => step.timestamp > now - 120000);
+                });
+                
+                // Trigger animation
+                setStepAnimation(true);
+                setTimeout(() => setStepAnimation(false), 300);
+                
+                // Update step count
+                setStepCount(newStepCount);
+                setLastStepTimestamp(now);
+                
+                console.log('Step detected! Total steps:', newStepCount);
+                
+                // Haptic feedback if available
+                if ('vibrate' in navigator && deviceType !== 'desktop') {
+                    navigator.vibrate(20);
+                }
+                
+                // Optional: Play step sound
+                playStepSound();
+            };
+
+            // Admin authentication functions
+            const handleLogin = () => {
+                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPassword('');
+                    localStorage.setItem('nav-admin', 'true');
+                    alert('Admin login successful!');
+                } else {
+                    alert('Invalid credentials');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsAdmin(false);
+                setMode('navigate');
+                localStorage.removeItem('nav-admin');
+                alert('Logged out successfully');
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setFloorPlan(event.target.result);
+                        setZoom(1);
+                        setOffset({ x: 0, y: 0 });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const drawCanvas = () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !floorPlan) return;
+
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const displayWidth = img.width * zoom;
+                    const displayHeight = img.height * zoom;
+                    
+                    canvas.width = displayWidth;
+                    canvas.height = displayHeight;
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(offset.x, offset.y);
+                    
+                    // Draw the image
+                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                    // Draw locations
+                    locations.forEach(loc => {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.beginPath();
+                        ctx.arc(loc.x * zoom, loc.y * zoom, 8 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.fillStyle = '#000';
+                        ctx.font = `${14 * zoom}px Arial`;
+                        ctx.fillText(loc.name, loc.x * zoom + 12 * zoom, loc.y * zoom + 5 * zoom);
+                    });
+
+                    // Draw pending location
+                    if (pendingLocation) {
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.arc(pendingLocation.x * zoom, pendingLocation.y * zoom, 10 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2 * zoom;
+                        ctx.stroke();
+                    }
+
+                    // Draw current training path
+                    if (mode === 'train' && currentPath.length > 0) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(currentPath[0].x * zoom, currentPath[0].y * zoom);
+                        currentPath.forEach(point => ctx.lineTo(point.x * zoom, point.y * zoom));
+                        ctx.stroke();
+                    }
+
+                    // Draw active navigation path
+                    if (activePath) {
+                        // Draw the path
+                        ctx.strokeStyle = isOnPath ? '#10b981' : '#ef4444';
+                        ctx.lineWidth = 4 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(activePath.path[0].x * zoom, activePath.path[0].y * zoom);
+                        activePath.path.forEach((point, idx) => {
+                            ctx.lineTo(point.x * zoom, point.y * zoom);
+                        });
+                        ctx.stroke();
+                        
+                        // Draw path markers (every 5 steps)
+                        const markerInterval = stepLength * 5;
+                        let accumulatedDistance = 0;
+                        
+                        for (let i = 0; i < activePath.path.length - 1; i++) {
+                            const start = activePath.path[i];
+                            const end = activePath.path[i + 1];
+                            const segmentLength = Math.sqrt(
+                                Math.pow(end.x - start.x, 2) + 
+                                Math.pow(end.y - start.y, 2)
+                            );
+                            
+                            const segmentDir = {
+                                x: (end.x - start.x) / segmentLength,
+                                y: (end.y - start.y) / segmentLength
+                            };
+                            
+                            // Draw markers along segment
+                            const markersCount = Math.floor(segmentLength / markerInterval);
+                            for (let m = 0; m <= markersCount; m++) {
+                                const markerX = start.x + segmentDir.x * m * markerInterval;
+                                const markerY = start.y + segmentDir.y * m * markerInterval;
+                                
+                                ctx.fillStyle = '#3b82f6';
+                                ctx.beginPath();
+                                ctx.arc(markerX * zoom, markerY * zoom, 3 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                            }
+                            
+                            accumulatedDistance += segmentLength;
+                        }
+
+                        // Draw current position (works for ALL modes)
+                        if (isNavigating && currentPosition) {
+                            const pos = currentPosition;
+                            
+                            // Draw user position dot
+                            ctx.fillStyle = isOnPath ? '#8b5cf6' : '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(pos.x * zoom, pos.y * zoom, 12 * zoom, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.strokeStyle = '#fff';
+                            ctx.lineWidth = 2 * zoom;
+                            ctx.stroke();
+                            
+                            // Draw direction arrow for motion/simulation modes
+                            if (isMotionTracking || isSimulationMode) {
+                                const angle = getDirectionAngle(currentDirection);
+                                const arrowLength = 20 * zoom;
+                                const arrowX = pos.x * zoom + Math.cos(angle) * arrowLength;
+                                const arrowY = pos.y * zoom + Math.sin(angle) * arrowLength;
+                                
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 3 * zoom;
+                                ctx.beginPath();
+                                ctx.moveTo(pos.x * zoom, pos.y * zoom);
+                                ctx.lineTo(arrowX, arrowY);
+                                ctx.stroke();
+                                
+                                // Draw arrowhead
+                                ctx.fillStyle = '#fff';
+                                ctx.beginPath();
+                                const headAngle = Math.PI / 6;
+                                ctx.moveTo(arrowX, arrowY);
+                                ctx.lineTo(
+                                    arrowX - 10 * zoom * Math.cos(angle - headAngle),
+                                    arrowY - 10 * zoom * Math.sin(angle - headAngle)
+                                );
+                                ctx.lineTo(
+                                    arrowX - 10 * zoom * Math.cos(angle + headAngle),
+                                    arrowY - 10 * zoom * Math.sin(angle + headAngle)
+                                );
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+                            
+                            // Draw step counter on canvas
+                            ctx.fillStyle = '#000';
+                            ctx.font = `bold ${12 * zoom}px Arial`;
+                            ctx.fillText(`Steps: ${stepCount}`, pos.x * zoom + 20 * zoom, pos.y * zoom - 25 * zoom);
+                            
+                            if (!isOnPath) {
+                                ctx.fillStyle = '#ef4444';
+                                ctx.font = `${10 * zoom}px Arial`;
+                                ctx.fillText('OFF PATH', pos.x * zoom + 20 * zoom, pos.y * zoom + 25 * zoom);
+                            }
+                            
+                            // Draw line to closest path point if off path
+                            if (!isOnPath && pathDeviation > 0) {
+                                const { closestPoint } = findClosestPointOnPath(pos, activePath.path);
+                                
+                                ctx.strokeStyle = '#ef4444';
+                                ctx.lineWidth = 2 * zoom;
+                                ctx.setLineDash([5 * zoom, 3 * zoom]);
+                                ctx.beginPath();
+                                ctx.moveTo(pos.x * zoom, pos.y * zoom);
+                                ctx.lineTo(closestPoint.x * zoom, closestPoint.y * zoom);
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                            }
+                        } else if (isNavigating && currentStep < activePath.path.length) {
+                            // Fallback: draw static navigation dot
+                            const pos = activePath.path[currentStep];
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(pos.x * zoom, pos.y * zoom, 10 * zoom, 0, 2 * Math.PI);
+                            ctx.fill();
+                        }
+                    }
+                    
+                    ctx.restore();
+                };
+                img.src = floorPlan;
+            };
+
+            const getDirectionAngle = (direction) => {
+                const directionAngles = {
+                    'N': -Math.PI / 2,
+                    'NE': -Math.PI / 4,
+                    'E': 0,
+                    'SE': Math.PI / 4,
+                    'S': Math.PI / 2,
+                    'SW': 3 * Math.PI / 4,
+                    'W': Math.PI,
+                    'NW': -3 * Math.PI / 4
+                };
+                return directionAngles[direction] || 0;
+            };
+
+            const handleCanvasClick = (e) => {
+                if (!isAdmin && (mode === 'view' || mode === 'train')) {
+                    alert('Admin access required for this mode');
+                    return;
+                }
+
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offset.x) / zoom;
+                const y = (e.clientY - rect.top - offset.y) / zoom;
+
+                if (addingLocation) {
+                    setPendingLocation({ x, y });
+                } else if (mode === 'train') {
+                    setCurrentPath([...currentPath, { x, y }]);
+                } else if (isClickToMove && isNavigating && isSimulationMode) {
+                    // Click to move in simulation mode
+                    moveToPosition({ x, y });
+                }
+            };
+
+            // Click to move functionality
+            const moveToPosition = (targetPos) => {
+                if (!currentPosition || !activePath) return;
+                
+                const distance = Math.sqrt(
+                    Math.pow(targetPos.x - currentPosition.x, 2) + 
+                    Math.pow(targetPos.y - currentPosition.y, 2)
+                );
+                
+                const steps = Math.round(distance / stepLength);
+                setStepCount(prev => prev + steps);
+                setCurrentPosition(targetPos);
+                
+                // Track path position
+                trackPathPosition(targetPos);
+            };
+
+            // Zoom functions
+            const zoomIn = () => {
+                setZoom(prevZoom => Math.min(prevZoom * 1.2, 5));
+            };
+
+            const zoomOut = () => {
+                setZoom(prevZoom => Math.max(prevZoom / 1.2, 0.1));
+            };
+
+            const resetZoom = () => {
+                setZoom(1);
+                setOffset({ x: 0, y: 0 });
+            };
+
+            // Pan functionality
+            const handleMouseDown = (e) => {
+                if (e.button !== 0) return;
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - offset.x,
+                    y: e.clientY - offset.y
+                });
+                canvasRef.current.style.cursor = 'grabbing';
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                
+                const newOffset = {
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                };
+                
+                setOffset(newOffset);
+            };
+
+            const handleMouseUp = () => {
+                setIsDragging(false);
+                canvasRef.current.style.cursor = 'grab';
+            };
+
+            // === MOTION TRACKING FUNCTIONS ===
+            const startMotionTracking = async () => {
+                if (!isMotionAvailable) {
+                    alert('Motion sensors not available. Starting simulation mode instead.');
+                    startSimulationMode();
+                    return;
+                }
+
+                try {
+                    // Request permission for iOS 13+
+                    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                        console.log('Requesting motion permission...');
+                        const permission = await DeviceMotionEvent.requestPermission();
+                        console.log('Motion permission:', permission);
+                        
+                        if (permission !== 'granted') {
+                            alert('Motion permission denied. Starting simulation mode.');
+                            startSimulationMode();
+                            return;
+                        }
+                    }
+
+                    // Initialize position
+                    if (activePath && activePath.path.length > 0) {
+                        setCurrentPosition(activePath.path[0]);
+                        lastPositionRef.current = activePath.path[0];
+                    }
+                    
+                    setStepCount(0);
+                    setIsMotionTracking(true);
+                    setIsSimulationMode(false);
+                    
+                    // Start motion and orientation listeners
+                    startMotionListeners();
+                    
+                    speakInstruction(activePath.instructions[0]);
+                    
+                    console.log('Motion tracking started');
+                    
+                } catch (error) {
+                    console.error('Error starting motion tracking:', error);
+                    alert('Failed to start motion tracking. Starting simulation mode.');
+                    startSimulationMode();
+                }
+            };
+
+            const startMotionListeners = () => {
+                console.log('Starting motion listeners...');
+                
+                // Device Motion for step detection
+                const handleMotion = (event) => {
+                    if (!isMotionTracking) return;
+                    
+                    const accel = event.accelerationIncludingGravity || event.acceleration;
+                    if (!accel) return;
+                    
+                    // Update motion data
+                    const newMotionData = {
+                        acceleration: {
+                            x: accel.x || 0,
+                            y: accel.y || 0,
+                            z: accel.z || 0
+                        },
+                        rotation: motionData.rotation,
+                        lastStepTime: motionData.lastStepTime
+                    };
+                    
+                    setMotionData(newMotionData);
+                    
+                    // Step detection logic
+                    detectStepFromMotion(accel);
+                };
+
+                // Device Orientation for direction
+                const handleOrientation = (event) => {
+                    if (!isMotionTracking) return;
+                    
+                    const newMotionData = {
+                        acceleration: motionData.acceleration,
+                        rotation: {
+                            alpha: event.alpha || 0,
+                            beta: event.beta || 0,
+                            gamma: event.gamma || 0
+                        },
+                        lastStepTime: motionData.lastStepTime
+                    };
+                    
+                    setMotionData(newMotionData);
+                    
+                    // Calculate direction from compass
+                    if (event.alpha !== null && event.alpha !== undefined) {
+                        const direction = getDirectionFromCompass(event.alpha);
+                        setCurrentDirection(direction);
+                    }
+                };
+
+                // Add event listeners
+                window.addEventListener('devicemotion', handleMotion);
+                window.addEventListener('deviceorientation', handleOrientation);
+                
+                // Store references for cleanup
+                motionListenersRef.current = {
+                    motion: handleMotion,
+                    orientation: handleOrientation
+                };
+            };
+
+            const stopMotionTracking = () => {
+                console.log('Stopping motion tracking...');
+                
+                // Remove event listeners
+                if (motionListenersRef.current.motion) {
+                    window.removeEventListener('devicemotion', motionListenersRef.current.motion);
+                }
+                if (motionListenersRef.current.orientation) {
+                    window.removeEventListener('deviceorientation', motionListenersRef.current.orientation);
+                }
+                
+                setIsMotionTracking(false);
+            };
+
+            const getDirectionFromCompass = (compassAngle) => {
+                // Convert compass angle to 8-direction system
+                const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                const normalizedAngle = ((compassAngle % 360) + 360) % 360;
+                const index = Math.round(normalizedAngle / 45) % 8;
+                return directions[index];
+            };
+
+            const detectStepFromMotion = (acceleration) => {
+                const now = Date.now();
+                const timeSinceLastStep = now - lastStepTimeRef.current;
+                
+                // Cooldown period to prevent multiple detections
+                if (timeSinceLastStep < stepCooldownRef.current) return;
+                
+                // Get acceleration values
+                const ax = acceleration.x || 0;
+                const ay = acceleration.y || 0;
+                const az = acceleration.z || 0;
+                
+                // Get previous acceleration values
+                const prevAx = lastAccelerationRef.current.x;
+                const prevAy = lastAccelerationRef.current.y;
+                const prevAz = lastAccelerationRef.current.z;
+                
+                // Calculate magnitude of acceleration change
+                const deltaX = Math.abs(ax - prevAx);
+                const deltaY = Math.abs(ay - prevAy);
+                const deltaZ = Math.abs(az - prevAz);
+                
+                const totalDelta = deltaX + deltaY + deltaZ;
+                
+                // Step detection threshold (adjust as needed)
+                const stepThreshold = 2.5;
+                
+                // Detect step when acceleration change exceeds threshold
+                if (totalDelta > stepThreshold) {
+                    lastStepTimeRef.current = now;
+                    detectStep();
+                }
+                
+                // Store current acceleration for next comparison
+                lastAccelerationRef.current = { x: ax, y: ay, z: az };
+            };
+
+            // === SIMULATION MODE (For Desktop/Laptops) ===
+            const startSimulationMode = () => {
+                if (!activePath) return;
+                
+                setIsSimulationMode(true);
+                setIsMotionTracking(false);
+                setStepCount(0);
+                
+                // Start at first point of path
+                setCurrentPosition(activePath.path[0]);
+                lastPositionRef.current = activePath.path[0];
+                setCurrentDirection('E'); // Default direction
+                
+                speakInstruction(activePath.instructions[0]);
+                
+                // Show instructions based on device
+                if (deviceType === 'desktop') {
+                    alert('Simulation Mode Started!\n\nUse:\n• Arrow Keys to move\n• Or Click on map to teleport\n• WASD keys also work\n\nStep counter will show your progress!');
+                } else {
+                    alert('Simulation Mode Started!\n\nUse the arrow buttons below to move the dot.\n\nStep counter will show your progress!');
+                }
+            };
+
+            const handleSimulationKey = (e) => {
+                if (!isSimulationMode || !currentPosition || !isNavigating) return;
+                
+                const stepSize = stepLength;
+                let newPosition = { ...currentPosition };
+                let newDirection = currentDirection;
+                
+                switch(e.key.toLowerCase()) {
+                    case 'arrowup':
+                    case 'w':
+                        newPosition.y -= stepSize;
+                        newDirection = 'N';
+                        break;
+                    case 'arrowdown':
+                    case 's':
+                        newPosition.y += stepSize;
+                        newDirection = 'S';
+                        break;
+                    case 'arrowleft':
+                    case 'a':
+                        newPosition.x -= stepSize;
+                        newDirection = 'W';
+                        break;
+                    case 'arrowright':
+                    case 'd':
+                        newPosition.x += stepSize;
+                        newDirection = 'E';
+                        break;
+                    default:
+                        return;
+                }
+                
+                setCurrentPosition(newPosition);
+                setCurrentDirection(newDirection);
+                setStepCount(prev => prev + 1);
+                
+                // Track path position
+                trackPathPosition(newPosition);
+                
+                e.preventDefault();
+            };
+
+            const handleSimulationButton = (direction) => {
+                if (!isSimulationMode || !currentPosition || !isNavigating) return;
+                
+                const stepSize = stepLength;
+                let newPosition = { ...currentPosition };
+                let newDirection = direction.charAt(0).toUpperCase();
+                
+                // Handle diagonal directions
+                if (direction === 'up') newDirection = 'N';
+                if (direction === 'down') newDirection = 'S';
+                if (direction === 'left') newDirection = 'W';
+                if (direction === 'right') newDirection = 'E';
+                
+                switch(direction) {
+                    case 'up':
+                        newPosition.y -= stepSize;
+                        break;
+                    case 'down':
+                        newPosition.y += stepSize;
+                        break;
+                    case 'left':
+                        newPosition.x -= stepSize;
+                        break;
+                    case 'right':
+                        newPosition.x += stepSize;
+                        break;
+                }
+                
+                setCurrentPosition(newPosition);
+                setCurrentDirection(newDirection);
+                setStepCount(prev => prev + 1);
+                
+                // Track path position
+                trackPathPosition(newPosition);
+            };
+
+            const playStepSound = () => {
+                // Create a simple step sound using Web Audio API
+                try {
+                    if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        const audioContext = new AudioContext();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.value = 600;
+                        oscillator.type = 'sine';
+                        
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.05);
+                    }
+                } catch (error) {
+                    // Silently fail if audio context is not available
+                }
+            };
+
+            const updatePositionFromSteps = () => {
+                if (!currentPosition || !activePath || !(isMotionTracking || isSimulationMode)) return;
+
+                const movementX = Math.cos(getDirectionAngle(currentDirection)) * stepLength;
+                const movementY = Math.sin(getDirectionAngle(currentDirection)) * stepLength;
+
+                const newPosition = {
+                    x: currentPosition.x + movementX,
+                    y: currentPosition.y + movementY
+                };
+
+                setCurrentPosition(newPosition);
+                
+                // Track path position
+                trackPathPosition(newPosition);
+            };
+
+            const toggleClickToMove = () => {
+                setIsClickToMove(!isClickToMove);
+                if (!isClickToMove) {
+                    alert('Click-to-Move Enabled!\n\nClick anywhere on the map to move the purple dot instantly.');
+                }
+            };
+
+            const calibrateStepLength = () => {
+                const newLength = prompt('Enter step length in pixels (default: 50):', stepLength);
+                if (newLength && !isNaN(newLength)) {
+                    setStepLength(parseInt(newLength));
+                    alert(`Step length set to ${newLength} pixels per step.`);
+                }
+            };
+
+            // Start adding location
+            const startAddingLocation = () => {
+                if (!isAdmin) {
+                    alert('Admin access required to add locations');
+                    return;
+                }
+                setAddingLocation(true);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const confirmAddLocation = () => {
+                if (!newLocationName.trim()) {
+                    alert('Please enter a location name');
+                    return;
+                }
+                if (!pendingLocation) {
+                    alert('Please click on the floor plan to place the location');
+                    return;
+                }
+                setLocations([...locations, { 
+                    name: newLocationName.trim(), 
+                    x: pendingLocation.x, 
+                    y: pendingLocation.y 
+                }]);
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const cancelAddLocation = () => {
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            // Instruction editing functions
+            const startEditInstruction = (index) => {
+                if (!isAdmin) {
+                    alert('Admin access required to edit instructions');
+                    return;
+                }
+                setEditingInstructionIndex(index);
+                setEditingInstructionText(instructions[index]);
+            };
+
+            const saveEditInstruction = () => {
+                if (editingInstructionText.trim()) {
+                    const newInstructions = [...instructions];
+                    newInstructions[editingInstructionIndex] = editingInstructionText.trim();
+                    setInstructions(newInstructions);
+                }
+                setEditingInstructionIndex(null);
+                setEditingInstructionText('');
+            };
+
+            const cancelEditInstruction = () => {
+                setEditingInstructionIndex(null);
+                setEditingInstructionText('');
+            };
+
+            const deleteInstruction = (index) => {
+                if (!isAdmin) {
+                    alert('Admin access required to delete instructions');
+                    return;
+                }
+                const newInstructions = instructions.filter((_, i) => i !== index);
+                setInstructions(newInstructions);
+            };
+
+            const addNewInstruction = () => {
+                if (!isAdmin) {
+                    alert('Admin access required to add instructions');
+                    return;
+                }
+                if (newInstructionText.trim()) {
+                    setInstructions([...instructions, newInstructionText.trim()]);
+                    setNewInstructionText('');
+                }
+            };
+
+            // Path editing functions
+            const startEditPath = (index) => {
+                if (!isAdmin) {
+                    alert('Admin access required to edit paths');
+                    return;
+                }
+                const path = paths[index];
+                setEditingPathIndex(index);
+                setTrainingFrom(path.from);
+                setTrainingTo(path.to);
+                setCurrentPath(path.path);
+                setInstructions(path.instructions);
+                setSelectedPathIndex(index);
+            };
+
+            const cancelEditPath = () => {
+                setEditingPathIndex(null);
+                setTrainingFrom('');
+                setTrainingTo('');
+                setCurrentPath([]);
+                setInstructions([]);
+                setSelectedPathIndex(null);
+            };
+
+            const updatePath = () => {
+                if (!trainingFrom || !trainingTo || currentPath.length < 2) {
+                    alert('Please select start/end locations and draw a path');
+                    return;
+                }
+
+                const finalInstructions = instructions.length > 0 ? 
+                    instructions : 
+                    generateInstructions(currentPath);
+
+                const updatedPath = {
+                    from: trainingFrom,
+                    to: trainingTo,
+                    path: currentPath,
+                    instructions: finalInstructions
+                };
+
+                const newPaths = [...paths];
+                newPaths[editingPathIndex] = updatedPath;
+                setPaths(newPaths);
+                
+                cancelEditPath();
+                alert('Path updated successfully!');
+            };
+
+            const deletePath = (index) => {
+                if (!isAdmin) {
+                    alert('Admin access required to delete paths');
+                    return;
+                }
+                if (confirm('Are you sure you want to delete this path?')) {
+                    const newPaths = paths.filter((_, i) => i !== index);
+                    setPaths(newPaths);
+                    if (selectedPathIndex === index) {
+                        setSelectedPathIndex(null);
+                    }
+                }
+            };
+
+            const loadPathForNavigation = (index) => {
+                const path = paths[index];
+                setNavigateFrom(path.from);
+                setNavigateTo(path.to);
+                setSelectedPathIndex(index);
+            };
+
+            // Clear function
+            const clearCurrentPath = () => {
+                setCurrentPath([]);
+                setInstructions([]);
+                setTrainingFrom('');
+                setTrainingTo('');
+                setNewInstructionText('');
+                setEditingInstructionIndex(null);
+                setEditingInstructionText('');
+            };
+
+            const generateInstructions = (pathPoints) => {
+                if (pathPoints.length < 2) return ['Path too short'];
+                
+                const autoInstructions = [];
+                autoInstructions.push(`Start from ${trainingFrom}`);
+
+                for (let i = 1; i < pathPoints.length - 1; i++) {
+                    autoInstructions.push(`Continue to point ${i}`);
+                }
+
+                autoInstructions.push(`Arrive at ${trainingTo}`);
+                return autoInstructions;
+            };
+
+            const calculateTotalDistance = (pathPoints) => {
+                let total = 0;
+                for (let i = 1; i < pathPoints.length; i++) {
+                    const dx = pathPoints[i].x - pathPoints[i-1].x;
+                    const dy = pathPoints[i].y - pathPoints[i-1].y;
+                    total += Math.sqrt(dx * dx + dy * dy);
+                }
+                return Math.round(total);
+            };
+
+            const saveTrainingPath = () => {
+                if (!trainingFrom || !trainingTo || currentPath.length < 2) {
+                    alert('Please select start/end locations and draw a path');
+                    return;
+                }
+
+                const finalInstructions = instructions.length > 0 ? 
+                    instructions : 
+                    generateInstructions(currentPath);
+
+                const newPath = {
+                    from: trainingFrom,
+                    to: trainingTo,
+                    path: currentPath,
+                    instructions: finalInstructions
+                };
+
+                setPaths([...paths, newPath]);
+                clearCurrentPath();
+                alert('Path saved!');
+            };
+
+            const autoGenerateInstructions = () => {
+                if (currentPath.length < 2) {
+                    alert('Please draw a path first');
+                    return;
+                }
+                const autoInstructions = generateInstructions(currentPath);
+                setInstructions(autoInstructions);
+            };
+
+            // =============================================
+            // UPDATED NAVIGATION FUNCTIONS
+            // =============================================
+            
+            const startAppropriateMode = () => {
+                // Auto-detect best mode based on device
+                if (isMotionAvailable && (deviceType === 'mobile' || deviceType === 'tablet')) {
+                    const useMotion = confirm(`Detected ${deviceType.toUpperCase()} with motion sensors.\n\nUse motion tracking? (Yes)\nUse simulation mode? (No)`);
+                    if (useMotion) {
+                        startMotionTracking();
+                    } else {
+                        startSimulationMode();
+                    }
+                } else {
+                    // Desktop or no motion sensors
+                    alert(`Starting Simulation Mode for ${deviceType.toUpperCase()}.\n\nUse arrow keys or click to navigate.`);
+                    startSimulationMode();
+                }
+            };
+
+            const startNavigation = () => {
+                // First check if both dropdowns are selected
+                if (!navigateFrom || !navigateTo) {
+                    alert('Please select both "From" and "To" locations');
+                    return;
+                }
+
+                // Find the path that matches BOTH from and to locations
+                const path = paths.find(p => 
+                    p.from === navigateFrom && p.to === navigateTo
+                );
+
+                if (!path) {
+                    // Try to find reverse path
+                    const reversePath = paths.find(p => 
+                        p.from === navigateTo && p.to === navigateFrom
+                    );
+                    
+                    if (reversePath) {
+                        const useReverse = confirm(`Path found in reverse direction (${navigateTo} → ${navigateFrom}).\n\nUse reverse path?`);
+                        if (useReverse) {
+                            setActivePath({
+                                ...reversePath,
+                                // Reverse the path points if needed
+                                path: [...reversePath.path].reverse(),
+                                instructions: [`Starting from ${navigateFrom}`, ...reversePath.instructions.slice(1).map(inst => 
+                                    inst.replace(reversePath.from, navigateFrom).replace(reversePath.to, navigateTo)
+                                )]
+                            });
+                            setIsNavigating(true);
+                            setCurrentStep(0);
+                            setStepCount(0);
+                            startAppropriateMode();
+                            return;
+                        }
+                    }
+                    
+                    alert(`No path found between "${navigateFrom}" and "${navigateTo}"`);
+                    console.log('Available paths:', paths);
+                    console.log('Looking for:', navigateFrom, '->', navigateTo);
+                    return;
+                }
+
+                setActivePath(path);
+                setIsNavigating(true);
+                setCurrentStep(0);
+                setStepCount(0);
+                
+                startAppropriateMode();
+            };
+
+            const speakInstruction = (text) => {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            const nextStep = () => {
+                if (!activePath || !isNavigating) return;
+                
+                const nextIdx = currentStep + 1;
+                if (nextIdx < activePath.instructions.length) {
+                    setCurrentStep(nextIdx);
+                    speakInstruction(activePath.instructions[nextIdx]);
+                } else {
+                    stopNavigation();
+                }
+            };
+
+            const stopNavigation = () => {
+                setIsNavigating(false);
+                setIsMotionTracking(false);
+                setIsSimulationMode(false);
+                setActivePath(null);
+                setCurrentStep(0);
+                setCurrentPosition(null);
+                setStepCount(0);
+                setPathProgress(0);
+                setDistanceTravelled(0);
+                setIsOnPath(true);
+                setPathDeviation(0);
+                setPathTrackingHistory([]);
+                setStepHistory([]);
+                setStepsPerMinute(0);
+                
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+                
+                // Stop motion tracking if active
+                stopMotionTracking();
+                stopPathTracking();
+                stopStepTimer();
+            };
+
+            const handleModeChange = (newMode) => {
+                if ((newMode === 'view' || newMode === 'train') && !isAdmin) {
+                    alert('Admin access required for this mode');
+                    return;
+                }
+                setMode(newMode);
+            };
+
+            // Location dropdown component
+            const LocationDropdown = ({ value, onChange, placeholder, disabled }) => {
+                return React.createElement('select', {
+                    value: value,
+                    onChange: (e) => onChange(e.target.value),
+                    className: 'w-full mb-2',
+                    disabled: disabled
+                },
+                    React.createElement('option', { value: '' }, placeholder),
+                    locations.map((loc, idx) =>
+                        React.createElement('option', { key: idx, value: loc.name }, loc.name)
+                    )
+                );
+            };
+
+            // Step Counter Overlay Component
+            const StepCounterOverlay = () => {
+                if (!isNavigating || (!isMotionTracking && !isSimulationMode)) return null;
+                
+                return React.createElement('div', { 
+                    className: `step-counter-overlay ${stepAnimation ? 'step-animation' : ''}`,
+                    ref: stepCounterRef
+                },
+                    React.createElement('div', { className: 'step-counter-header' },
+                        React.createElement('span', { className: 'step-counter-title' }, 'STEP COUNTER'),
+                        React.createElement('span', { className: 'step-counter-badge' }, 
+                            isMotionTracking ? 'MOTION' : 'SIM'
+                        )
+                    ),
+                    React.createElement('div', { className: 'step-counter-value' },
+                        stepCount.toLocaleString()
+                    ),
+                    React.createElement('div', { className: 'step-counter-label' },
+                        'Total Steps Taken'
+                    ),
+                    React.createElement('div', { className: 'step-counter-stats' },
+                        React.createElement('div', { className: 'step-counter-stat' },
+                            React.createElement('div', { className: 'step-counter-stat-label' }, 'Steps/Min'),
+                            React.createElement('div', { className: 'step-counter-stat-value' },
+                                stepsPerMinute
+                            )
+                        ),
+                        React.createElement('div', { className: 'step-counter-stat' },
+                            React.createElement('div', { className: 'step-counter-stat-label' }, 'Step Length'),
+                            React.createElement('div', { className: 'step-counter-stat-value' },
+                                `${stepLength}px`
+                            )
+                        ),
+                        React.createElement('div', { className: 'step-counter-stat' },
+                            React.createElement('div', { className: 'step-counter-stat-label' }, 'Progress'),
+                            React.createElement('div', { className: 'step-counter-stat-value' },
+                                `${Math.round(pathProgress)}%`
+                            )
+                        ),
+                        React.createElement('div', { className: 'step-counter-stat' },
+                            React.createElement('div', { className: 'step-counter-stat-label' }, 'Status'),
+                            React.createElement('div', { className: 'step-counter-stat-value', style: { color: isOnPath ? '#10b981' : '#ef4444' } },
+                                isOnPath ? 'On Path' : 'Off Path'
+                            )
+                        )
+                    )
+                );
+            };
+
+            // Path Progress Display Component
+            const PathProgressDisplay = () => {
+                if (!isNavigating || !activePath) return null;
+                
+                const deviationLevel = getDeviationLevel(pathDeviation);
+                const deviationClass = `deviation-${deviationLevel}`;
+                
+                return React.createElement('div', { className: 'mb-4' },
+                    React.createElement('div', { className: 'flex justify-between items-center mb-1' },
+                        React.createElement('span', { className: 'text-sm font-medium' }, 'Path Progress'),
+                        React.createElement('span', { className: 'text-sm font-bold' }, `${Math.round(pathProgress)}%`)
+                    ),
+                    React.createElement('div', { className: 'path-progress' },
+                        React.createElement('div', { 
+                            className: 'path-progress-fill',
+                            style: { width: `${pathProgress}%` }
+                        })
+                    ),
+                    React.createElement('div', { className: 'progress-text' },
+                        `Travelled: ${Math.round(distanceTravelled)}px / ${Math.round(totalPathDistance)}px`
+                    ),
+                    React.createElement('div', { className: `path-deviation ${deviationClass}` },
+                        React.createElement('div', { className: 'flex items-center justify-between' },
+                            React.createElement('span', null,
+                                isOnPath ? '✓ On Path' : '⚠️ Off Path'
+                            ),
+                            React.createElement('span', null, getDeviationMessage(pathDeviation))
+                        )
+                    ),
+                    !isOnPath && React.createElement('div', { className: 'alert-error mt-2' },
+                        'You are off the path! Please return to the marked route.'
+                    )
+                );
+            };
+
+            // Navigation Control Panel Component
+            const NavigationControlPanel = () => {
+                if (!isNavigating || (!isMotionTracking && !isSimulationMode)) return null;
+
+                return React.createElement('div', { 
+                    className: isMotionTracking ? 'motion-panel' : 'simulation-panel' 
+                },
+                    React.createElement('div', { 
+                        className: `status-indicator ${isMotionTracking ? 'status-active' : 'status-simulation'} ${isOnPath ? 'status-on-path' : 'status-off-path'}` 
+                    },
+                        isMotionTracking ? '📱 MOTION TRACKING' : '🎮 SIMULATION MODE',
+                        React.createElement('span', { className: 'ml-2' }, isOnPath ? '✓' : '⚠️')
+                    ),
+                    
+                    // Path Progress Display
+                    React.createElement(PathProgressDisplay, null),
+                    
+                    React.createElement('div', { className: 'step-display' },
+                        React.createElement('span', { className: 'step-count' }, stepCount),
+                        React.createElement('span', null, 'STEPS'),
+                        React.createElement('div', { className: 'direction-display' },
+                            currentDirection
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'data-grid' },
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'MODE'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                isMotionTracking ? 'Motion' : 'Simulation'
+                            )
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'DEVICE'),
+                            React.createElement('div', { className: 'data-value' }, deviceType)
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'STEP LENGTH'),
+                            React.createElement('div', { className: 'data-value' }, `${stepLength}px`)
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'WAYPOINT'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                `${nextWaypoint}/${activePath?.instructions.length || 0}`
+                            )
+                        )
+                    ),
+                    
+                    // Motion data display (only for motion tracking)
+                    isMotionTracking && React.createElement('div', { className: 'data-grid mt-2' },
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'ACCEL X'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                motionData.acceleration.x.toFixed(2)
+                            )
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'ACCEL Y'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                motionData.acceleration.y.toFixed(2)
+                            )
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'COMPASS'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                `${motionData.rotation.alpha.toFixed(0)}°`
+                            )
+                        ),
+                        React.createElement('div', { className: 'data-item' },
+                            React.createElement('div', { className: 'data-label' }, 'TILT'),
+                            React.createElement('div', { className: 'data-value' }, 
+                                `${motionData.rotation.beta.toFixed(0)}°`
+                            )
+                        )
+                    ),
+                    
+                    // Simulation controls (shown on all devices)
+                    isSimulationMode && React.createElement('div', null,
+                        deviceType === 'desktop' && React.createElement('div', { className: 'mb-2 text-xs text-gray-600' },
+                            'Use Arrow Keys, WASD, or:'
+                        ),
+                        
+                        React.createElement('div', { className: 'control-buttons' },
+                            React.createElement('button', {
+                                onClick: () => handleSimulationButton('up'),
+                                className: 'control-btn up'
+                            }, React.createElement(ArrowUpIcon)),
+                            React.createElement('button', {
+                                onClick: () => handleSimulationButton('left'),
+                                className: 'control-btn left'
+                            }, React.createElement(ArrowLeftIcon)),
+                            React.createElement('div', { className: 'control-btn center' }, '👆'),
+                            React.createElement('button', {
+                                onClick: () => handleSimulationButton('right'),
+                                className: 'control-btn right'
+                            }, React.createElement(ArrowRightIcon)),
+                            React.createElement('button', {
+                                onClick: () => handleSimulationButton('down'),
+                                className: 'control-btn down'
+                            }, React.createElement(ArrowDownIcon))
+                        ),
+                        
+                        React.createElement('div', { className: 'flex gap-2 mt-2' },
+                            React.createElement('button', {
+                                onClick: toggleClickToMove,
+                                className: `flex-1 text-sm ${isClickToMove ? 'btn-success' : 'btn-secondary'}`,
+                                title: 'Click on map to move instantly'
+                            }, React.createElement(ClickIcon), isClickToMove ? ' Click ON' : ' Click OFF'),
+                            React.createElement('button', {
+                                onClick: calibrateStepLength,
+                                className: 'btn-warning flex-1 text-sm'
+                            }, React.createElement(WalkIcon), ' Calibrate')
+                        )
+                    ),
+                    
+                    React.createElement('button', {
+                        onClick: stopNavigation,
+                        className: 'btn-danger w-full mt-2 text-sm'
+                    }, 'Stop Navigation')
+                );
+            };
+
+            return React.createElement('div', { className: 'app' },
+                React.createElement('div', { className: 'sidebar' },
+                    React.createElement('div', { className: 'flex justify-between items-center mb-4' },
+                        React.createElement('h1', null, 'Floor Plan Navigator'),
+                        React.createElement('div', { className: 'flex items-center' },
+                            React.createElement('span', { className: 'text-xs bg-gray-200 px-2 py-1 rounded' },
+                                deviceType.toUpperCase()
+                            ),
+                            isAdmin && React.createElement('span', { className: 'admin-indicator ml-2' }, 'ADMIN')
+                        )
+                    ),
+                    
+                    // Navigation Control Panel
+                    React.createElement(NavigationControlPanel, null),
+                    
+                    // Admin Login/Logout Section
+                    React.createElement('div', { className: 'section' },
+                        !isAdmin ? (
+                            React.createElement('div', null,
+                                React.createElement('button', {
+                                    onClick: () => setShowLogin(true),
+                                    className: 'btn-warning w-full'
+                                }, React.createElement(LoginIcon), ' Admin Login'),
+                                showLogin && React.createElement('div', { className: 'login-panel' },
+                                    React.createElement('h3', null, 'Admin Login'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        value: username,
+                                        onChange: (e) => setUsername(e.target.value),
+                                        placeholder: 'Username',
+                                        className: 'w-full mb-2'
+                                    }),
+                                    React.createElement('input', {
+                                        type: 'password',
+                                        value: password,
+                                        onChange: (e) => setPassword(e.target.value),
+                                        placeholder: 'Password',
+                                        className: 'w-full mb-2',
+                                        onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+                                    }),
+                                    React.createElement('div', { className: 'flex gap-2' },
+                                        React.createElement('button', {
+                                            onClick: handleLogin,
+                                            className: 'btn-success flex-1'
+                                        }, 'Login'),
+                                        React.createElement('button', {
+                                            onClick: () => setShowLogin(false),
+                                            className: 'btn-secondary flex-1'
+                                        }, 'Cancel')
+                                    )
+                                )
+                            )
+                        ) : (
+                            React.createElement('button', {
+                                onClick: handleLogout,
+                                className: 'btn-secondary w-full'
+                            }, React.createElement(LogoutIcon), ' Logout Admin')
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('button', {
+                            onClick: () => fileInputRef.current?.click(),
+                            className: 'btn-primary w-full',
+                            disabled: !isAdmin && mode !== 'navigate'
+                        }, React.createElement(UploadIcon), ' Upload Floor Plan'),
+                        React.createElement('input', {
+                            ref: fileInputRef,
+                            type: 'file',
+                            accept: 'image/*',
+                            onChange: handleFileUpload,
+                            className: 'hidden'
+                        })
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('label', { className: 'text-sm' }, 'Mode:'),
+                        React.createElement('div', { className: 'mode-buttons' },
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('view'),
+                                className: `mode-btn ${mode === 'view' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'View'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('train'),
+                                className: `mode-btn train ${mode === 'train' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'Train'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('navigate'),
+                                className: `mode-btn navigate ${mode === 'navigate' ? 'active' : ''}`
+                            }, 'Navigate')
+                        ),
+                        React.createElement('div', { className: 'text-xs text-gray-600 mt-2' },
+                            !isMotionAvailable && deviceType === 'desktop' 
+                                ? 'Using simulation mode (arrow keys/click)'
+                                : isMotionAvailable 
+                                    ? 'Motion sensors available'
+                                    : 'Motion sensors not available'
+                        )
+                    ),
+
+                    mode === 'train' && isAdmin && React.createElement('div', null,
+                        editingPathIndex !== null && React.createElement('div', { className: 'edit-path-panel' },
+                            React.createElement('h3', null, `Editing Path: ${paths[editingPathIndex]?.from} → ${paths[editingPathIndex]?.to}`),
+                            React.createElement(LocationDropdown, {
+                                value: trainingFrom,
+                                onChange: setTrainingFrom,
+                                placeholder: 'From...'
+                            }),
+                            React.createElement(LocationDropdown, {
+                                value: trainingTo,
+                                onChange: setTrainingTo,
+                                placeholder: 'To...'
+                            }),
+                            React.createElement('p', { className: 'text-xs text-gray-600 mb-2' }, 'Click on canvas to modify path'),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: updatePath,
+                                    className: 'btn-success flex-1 text-sm'
+                                }, React.createElement(SaveIcon), ' Update Path'),
+                                React.createElement('button', {
+                                    onClick: cancelEditPath,
+                                    className: 'btn-secondary text-sm'
+                                }, 'Cancel Edit')
+                            ),
+                            currentPath.length > 1 && React.createElement('div', { className: 'distance-indicator' },
+                                `Path distance: ${calculateTotalDistance(currentPath)} pixels`
+                            )
+                        ),
+
+                        !editingPathIndex && React.createElement('div', { className: 'training-panel' },
+                            React.createElement('h3', null, 'Train New Path'),
+                            React.createElement(LocationDropdown, {
+                                value: trainingFrom,
+                                onChange: setTrainingFrom,
+                                placeholder: 'From...'
+                            }),
+                            React.createElement(LocationDropdown, {
+                                value: trainingTo,
+                                onChange: setTrainingTo,
+                                placeholder: 'To...'
+                            }),
+                            React.createElement('p', { className: 'text-xs text-gray-600 mb-2' }, 'Click on canvas to draw path'),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: saveTrainingPath,
+                                    className: 'btn-success flex-1 text-sm'
+                                }, React.createElement(SaveIcon), ' Save Path'),
+                                React.createElement('button', {
+                                    onClick: clearCurrentPath,
+                                    className: 'btn-secondary text-sm'
+                                }, React.createElement(TrashIcon), ' Clear')
+                            ),
+                            currentPath.length > 1 && React.createElement('div', { className: 'distance-indicator' },
+                                `Path distance: ${calculateTotalDistance(currentPath)} pixels`
+                            )
+                        ),
+
+                        (currentPath.length > 0 || editingPathIndex !== null) && React.createElement('div', { className: 'instructions-panel' },
+                            React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                                React.createElement('h3', null, 'Navigation Instructions'),
+                                React.createElement('button', {
+                                    onClick: autoGenerateInstructions,
+                                    className: 'btn-warning text-sm'
+                                }, 'Auto-generate')
+                            ),
+                            
+                            React.createElement('div', { className: 'scroll-container', style: { maxHeight: '200px' } },
+                                instructions.length === 0 
+                                    ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No instructions yet.')
+                                    : instructions.map((instruction, index) =>
+                                        React.createElement('div', { key: index, className: 'instruction-item' },
+                                            React.createElement('div', { className: 'instruction-number' }, index + 1),
+                                            React.createElement('div', { className: 'instruction-content' },
+                                                editingInstructionIndex === index 
+                                                    ? React.createElement('input', {
+                                                        type: 'text',
+                                                        value: editingInstructionText,
+                                                        onChange: (e) => setEditingInstructionText(e.target.value),
+                                                        className: 'edit-instruction-input',
+                                                        onKeyPress: (e) => e.key === 'Enter' && saveEditInstruction(),
+                                                        autoFocus: true
+                                                    })
+                                                    : React.createElement('span', { className: 'text-sm' }, instruction)
+                                            ),
+                                            React.createElement('div', { className: 'instruction-actions' },
+                                                editingInstructionIndex === index 
+                                                    ? [
+                                                        React.createElement('button', {
+                                                            key: 'save',
+                                                            onClick: saveEditInstruction,
+                                                            className: 'instruction-edit-btn'
+                                                        }, 'Save'),
+                                                        React.createElement('button', {
+                                                            key: 'cancel',
+                                                            onClick: cancelEditInstruction,
+                                                            className: 'instruction-delete-btn'
+                                                        }, 'Cancel')
+                                                    ]
+                                                    : [
+                                                        React.createElement('button', {
+                                                            key: 'edit',
+                                                            onClick: () => startEditInstruction(index),
+                                                            className: 'instruction-edit-btn'
+                                                        }, React.createElement(EditIcon)),
+                                                        React.createElement('button', {
+                                                            key: 'delete',
+                                                            onClick: () => deleteInstruction(index),
+                                                            className: 'instruction-delete-btn'
+                                                        }, React.createElement(TrashIcon))
+                                                    ]
+                                            )
+                                        )
+                                    )
+                            ),
+                            
+                            React.createElement('div', { className: 'flex gap-2 mt-2' },
+                                React.createElement('input', {
+                                    type: 'text',
+                                    value: newInstructionText,
+                                    onChange: (e) => setNewInstructionText(e.target.value),
+                                    placeholder: 'Add new instruction...',
+                                    className: 'flex-1',
+                                    onKeyPress: (e) => e.key === 'Enter' && addNewInstruction()
+                                }),
+                                React.createElement('button', {
+                                    onClick: addNewInstruction,
+                                    className: 'add-instruction-btn',
+                                    style: { width: 'auto', padding: '0.5rem' }
+                                }, React.createElement(AddIcon))
+                            )
+                        )
+                    ),
+
+                    mode === 'navigate' && React.createElement('div', { className: 'navigation-panel' },
+                        React.createElement('h3', null, 'Navigate'),
+                        React.createElement(LocationDropdown, {
+                            value: navigateFrom,
+                            onChange: setNavigateFrom,
+                            placeholder: 'From...',
+                            disabled: isNavigating
+                        }),
+                        React.createElement(LocationDropdown, {
+                            value: navigateTo,
+                            onChange: setNavigateTo,
+                            placeholder: 'To...',
+                            disabled: isNavigating
+                        }),
+                        !isNavigating ? React.createElement('button', {
+                            onClick: startNavigation,
+                            className: 'btn-danger w-full'
+                        }, React.createElement(NavigationIcon), ' Start Navigation') :
+                        React.createElement('div', null,
+                            React.createElement('div', { className: 'instruction-text' },
+                                `Step ${currentStep + 1}/${activePath.instructions.length}`,
+                                React.createElement('br'),
+                                activePath.instructions[currentStep]
+                            ),
+                            !isMotionTracking && !isSimulationMode && React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: nextStep,
+                                    className: 'btn-primary flex-1 text-sm'
+                                }, React.createElement(PlayIcon), ' Next'),
+                                React.createElement('button', {
+                                    onClick: stopNavigation,
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Stop')
+                            )
+                        )
+                    ),
+
+                    // Locations Management (Admin only)
+                    isAdmin && React.createElement('div', { className: 'section' },
+                        React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                            React.createElement('h2', null, 'Manage Locations'),
+                            !addingLocation && React.createElement('button', {
+                                onClick: startAddingLocation,
+                                className: 'btn-primary text-sm'
+                            }, '+ Add Location')
+                        ),
+                        
+                        addingLocation && React.createElement('div', { className: 'add-location-panel' },
+                            React.createElement('h3', { className: 'text-sm' }, 'Add New Location'),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: newLocationName,
+                                onChange: (e) => setNewLocationName(e.target.value),
+                                placeholder: 'Enter location name...',
+                                className: 'w-full mb-2',
+                                onKeyPress: (e) => e.key === 'Enter' && confirmAddLocation()
+                            }),
+                            React.createElement('p', { className: 'text-xs text-gray-600 mb-2' },
+                                pendingLocation ? '✓ Location marked on map' : 'Click on the map to place marker'
+                            ),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: confirmAddLocation,
+                                    className: 'btn-success flex-1 text-sm'
+                                }, 'Save'),
+                                React.createElement('button', {
+                                    onClick: cancelAddLocation,
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Cancel')
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'scroll-container' },
+                            locations.length === 0 
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No locations added yet')
+                                : locations.map((loc, idx) =>
+                                    React.createElement('div', { key: idx, className: 'path-item' },
+                                        React.createElement('span', null, loc.name),
+                                        React.createElement('button', {
+                                            onClick: () => setLocations(locations.filter((_, i) => i !== idx)),
+                                            className: 'text-red-500'
+                                        }, React.createElement(TrashIcon))
+                                    )
+                                )
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('h2', null, `Saved Paths (${paths.length})`),
+                        React.createElement('div', { className: 'scroll-container' },
+                            paths.length === 0
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No paths saved yet')
+                                : paths.map((path, idx) =>
+                                    React.createElement('div', { 
+                                        key: idx, 
+                                        className: `path-item ${selectedPathIndex === idx ? 'active' : ''}`,
+                                        onClick: () => loadPathForNavigation(idx)
+                                    },
+                                        React.createElement('div', null,
+                                            `${path.from} → ${path.to}`,
+                                            React.createElement('span', { className: 'text-xs text-gray-600' },
+                                                ` (${path.instructions.length} steps, ${calculateTotalDistance(path.path)}px)`
+                                            )
+                                        ),
+                                        isAdmin && React.createElement('div', { className: 'path-actions' },
+                                            React.createElement('button', {
+                                                onClick: (e) => {
+                                                    e.stopPropagation();
+                                                    startEditPath(idx);
+                                                },
+                                                className: 'path-action-btn btn-info',
+                                                title: 'Edit Path'
+                                            }, React.createElement(EditIcon)),
+                                            React.createElement('button', {
+                                                onClick: (e) => {
+                                                    e.stopPropagation();
+                                                    deletePath(idx);
+                                                },
+                                                className: 'path-action-btn btn-danger',
+                                                title: 'Delete Path'
+                                            }, React.createElement(TrashIcon))
+                                        )
+                                    )
+                                )
+                        )
+                    ),
+
+                    // Debug button (can be removed in production)
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('button', {
+                            onClick: () => {
+                                console.log('Debug Info:', {
+                                    paths: paths,
+                                    locations: locations,
+                                    navigateFrom: navigateFrom,
+                                    navigateTo: navigateTo,
+                                    currentPosition: currentPosition,
+                                    pathProgress: pathProgress,
+                                    isOnPath: isOnPath,
+                                    pathDeviation: pathDeviation,
+                                    stepCount: stepCount
+                                });
+                                alert(`Paths: ${paths.length}\nLocations: ${locations.length}\nFrom: ${navigateFrom}\nTo: ${navigateTo}\nProgress: ${Math.round(pathProgress)}%\nOn Path: ${isOnPath ? 'Yes' : 'No'}\nSteps: ${stepCount}`);
+                            },
+                            className: 'btn-secondary w-full text-sm'
+                        }, 'Debug Info')
+                    ),
+
+                    isAdmin && React.createElement('button', {
+                        onClick: saveData,
+                        className: 'btn-primary w-full'
+                    }, React.createElement(SaveIcon), ' Save All Data')
+                ),
+
+                React.createElement('div', { className: 'main-content' },
+                    // ========== STEP COUNTER OVERLAY ==========
+                    (isNavigating && (isMotionTracking || isSimulationMode)) && 
+                    React.createElement('div', { 
+                        className: `step-counter-overlay ${stepAnimation ? 'step-animation' : ''}`,
+                        ref: stepCounterRef
+                    },
+                        React.createElement('div', { className: 'step-counter-header' },
+                            React.createElement('span', { className: 'step-counter-title' }, 'STEP COUNTER'),
+                            React.createElement('span', { className: 'step-counter-badge' }, 
+                                isMotionTracking ? 'MOTION' : 'SIM'
+                            )
+                        ),
+                        React.createElement('div', { className: 'step-counter-value' },
+                            stepCount.toLocaleString()
+                        ),
+                        React.createElement('div', { className: 'step-counter-label' },
+                            'Total Steps Taken'
+                        ),
+                        React.createElement('div', { className: 'step-counter-stats' },
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Steps/Min'),
+                                React.createElement('div', { className: 'step-counter-stat-value' },
+                                    stepsPerMinute
+                                )
+                            ),
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Step Length'),
+                                React.createElement('div', { className: 'step-counter-stat-value' },
+                                    `${stepLength}px`
+                                )
+                            ),
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Progress'),
+                                React.createElement('div', { className: 'step-counter-stat-value' },
+                                    `${Math.round(pathProgress)}%`
+                                )
+                            ),
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Status'),
+                                React.createElement('div', { className: 'step-counter-stat-value', style: { color: isOnPath ? '#10b981' : '#ef4444' } },
+                                    isOnPath ? 'On Path' : 'Off Path'
+                                )
+                            )
+                        )
+                    ),
+                    // ========== END STEP COUNTER OVERLAY ==========
+                    
+                    floorPlan && React.createElement('div', { className: 'zoom-controls' },
+                        React.createElement('button', {
+                            onClick: zoomOut,
+                            className: 'zoom-btn',
+                            disabled: zoom <= 0.1
+                        }, React.createElement(ZoomOutIcon)),
+                        React.createElement('div', { className: 'zoom-level' }, `${Math.round(zoom * 100)}%`),
+                        React.createElement('button', {
+                            onClick: zoomIn,
+                            className: 'zoom-btn',
+                            disabled: zoom >= 5
+                        }, React.createElement(ZoomInIcon)),
+                        React.createElement('button', {
+                            onClick: resetZoom,
+                            className: 'zoom-btn'
+                        }, React.createElement(ResetZoomIcon))
+                    ),
+                    
+                    floorPlan 
+                        ? React.createElement('div', { 
+                                className: 'canvas-container',
+                                onMouseDown: handleMouseDown,
+                                onMouseMove: handleMouseMove,
+                                onMouseUp: handleMouseUp,
+                                onMouseLeave: handleMouseUp
+                            },
+                            addingLocation && React.createElement('div', { className: 'alert-info' },
+                                'Adding Location Mode: Click anywhere on the floor plan to place a location marker'
+                            ),
+                            editingPathIndex !== null && React.createElement('div', { className: 'alert-info' },
+                                `Editing Path Mode: Click to modify the path from ${paths[editingPathIndex]?.from} to ${paths[editingPathIndex]?.to}`
+                            ),
+                            !isAdmin && (mode === 'view' || mode === 'train') && React.createElement('div', { className: 'alert-warning' },
+                                'Admin access required for this mode. Please login as admin.'
+                            ),
+                            isMotionTracking && React.createElement('div', { className: 'alert-info' },
+                                'Motion Tracking Active: Walk with your device to move the purple dot!'
+                            ),
+                            isSimulationMode && React.createElement('div', { className: 'alert-info' },
+                                deviceType === 'desktop' 
+                                    ? 'Simulation Mode: Use Arrow Keys, WASD, or click on map to move'
+                                    : 'Simulation Mode: Use arrow buttons below to move'
+                            ),
+                            isClickToMove && React.createElement('div', { className: 'alert-warning' },
+                                'Click-to-Move Active: Click anywhere on the map to move instantly'
+                            ),
+                            isNavigating && activePath && React.createElement('div', { className: `alert-${isOnPath ? 'success' : 'error'}` },
+                                isOnPath 
+                                    ? `✓ On Path: ${Math.round(pathProgress)}% complete (${Math.round(distanceTravelled)}/${Math.round(totalPathDistance)}px)`
+                                    : `⚠️ Off Path! Deviation: ${Math.round(pathDeviation)}px. Please return to the marked route.`
+                            ),
+                            React.createElement('canvas', {
+                                ref: canvasRef,
+                                onClick: handleCanvasClick,
+                                className: isClickToMove && isSimulationMode ? 'cursor-crosshair' : 'cursor-grab'
+                            })
+                        ) 
+                        : React.createElement('div', { className: 'upload-area' },
+                            React.createElement('div', { style: { fontSize: '3rem', marginBottom: '1rem' } }, '📤'),
+                            React.createElement('p', { className: 'text-lg font-semibold mb-2' }, 'Upload a Floor Plan'),
+                            React.createElement('p', { className: 'text-gray-600 mb-4' }, 'Supported formats: JPG, PNG, GIF, BMP'),
+                            React.createElement('button', {
+                                onClick: () => fileInputRef.current?.click(),
+                                className: 'btn-primary px-8 py-3 text-lg'
+                            }, 'Choose File')
+                        )
+                )
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(React.createElement(FloorPlanNavigator), document.getElementById('root'));
+    </script>
+</body>
+</html>
