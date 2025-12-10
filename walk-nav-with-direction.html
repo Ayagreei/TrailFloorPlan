@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Walk-to-Navigate with Direction</title>
+  <style>
+    :root{
+      --bg:#e8f7ff;
+      --ground:#d0f0c0;
+      --hud-bg: rgba(0,0,0,0.6);
+      --hud-color: #fff;
+    }
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    body{background:linear-gradient(180deg,var(--bg) 0%, #ffffff 70%); overflow:hidden;}
+    .viewport{position:relative;width:100%;height:100%;overflow:hidden;}
+    /* Bigger 2D world so we can move in any heading */
+    .world{
+      position:absolute;left:0;top:0;height:2000px;
+      width:4000px; /* large world */
+      display:block;
+      transition: transform 120ms linear;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 80%),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.02) 0 1px, transparent 1px 60px);
+    }
+    /* decorative ground-like area */
+    .ground{
+      position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,var(--ground),#b9e69a);border-top:4px solid rgba(0,0,0,0.06);
+    }
+    .world .scenery{position:absolute;width:140px;height:90px;background:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;font-weight:600;color:#333}
+    /* center avatar (stays visually in center of viewport) */
+    .avatar{
+      position:absolute;
+      left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      width:56px;height:56px;
+      z-index:40;
+      transition: transform 120ms linear;
+      will-change:transform;
+      transform-origin:50% 50%;
+    }
+    .avatar svg{display:block;}
+    .avatar::after{
+      content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;width:44px;height:8px;background:rgba(0,0,0,0.12);border-radius:50%;
+    }
+
+    .hud{
+      position:fixed;left:12px;top:12px;padding:10px 12px;background:var(--hud-bg);color:var(--hud-color);border-radius:10px;font-size:14px;z-index:50;
+      backdrop-filter: blur(6px);
+    }
+    .controls{position:fixed;right:12px;top:12px;z-index:50;display:flex;gap:8px;flex-direction:column}
+    .dir-controls{position:fixed;right:12px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#007aff;color:#fff;font-weight:600;box-shadow:0 6px 14px rgba(0,0,0,0.08)}
+    .small{padding:6px 8px;font-size:13px}
+    .note{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:999px;font-size:13px;z-index:40}
+    .compass{
+      width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;
+      box-shadow:0 4px 10px rgba(0,0,0,0.12);
+    }
+    .compass .arrow{width:18px;height:18px;transform-origin:center center;transition:transform 180ms linear}
+    .heading-display{font-size:13px;margin-left:8px;color:#fff;opacity:0.95}
+    @media (max-width:420px){
+      .world{width:3000px;height:1600px}
+      .hud{font-size:13px}
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport" id="viewport">
+    <div class="world" id="world" aria-hidden="true">
+      <!-- scattered scenery across the 2D world -->
+      <div class="scenery" style="left:120px;top:300px">A</div>
+      <div class="scenery" style="left:420px;top:200px">B</div>
+      <div class="scenery" style="left:860px;top:420px">C</div>
+      <div class="scenery" style="left:1400px;top:600px">D</div>
+      <div class="scenery" style="left:2100px;top:320px">E</div>
+      <div class="scenery" style="left:2800px;top:800px">F</div>
+      <div class="scenery" style="left:3500px;top:200px">G</div>
+      <div class="ground" aria-hidden="true"></div>
+    </div>
+
+    <!-- Avatar in center -->
+    <div class="avatar" id="avatar" aria-hidden="false" title="You">
+      <svg viewBox="0 0 24 24" width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+        <g>
+          <circle cx="12" cy="4" r="2.4" fill="#ffcc66"/>
+          <path d="M9 20c0-2.5 3-6 6-6s6 3.5 6 6" fill="#ffcc66"/>
+          <path d="M7 11c2 0 3.2-1.6 3.2-3.2S9 4.6 7 4.6 3.8 6.2 3.8 8.0 5 11 7 11z" fill="#ff7a66"/>
+          <path d="M13 9l3 3-1.5 3" stroke="#333" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.9" fill="none" />
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="hud" id="hud">
+    <div>Steps: <strong id="steps">0</strong></div>
+    <div>Distance: <strong id="distance">0.00</strong> m</div>
+    <div style="display:flex;align-items:center;margin-top:6px">
+      <div class="compass" id="compass" title="Heading">
+        <svg viewBox="0 0 24 24" class="arrow" id="compassArrow" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2 L15 11 L12 9 L9 11 Z" fill="#007aff"/>
+        </svg>
+      </div>
+      <div class="heading-display" id="headingDisplay">Heading: 0°</div>
+    </div>
+    <div id="status" style="margin-top:6px;font-size:12px;opacity:0.95">Sensor: unknown</div>
+  </div>
+
+  <div class="controls" id="controls">
+    <button id="request-perm" class="small">Enable Motion & Orientation (iOS)</button>
+    <button id="simulate-step" class="small">Simulate Step</button>
+    <button id="reset" class="small">Reset</button>
+  </div>
+
+  <div class="dir-controls" id="dirControls">
+    <button id="turn-left" class="small">◀ Turn Left</button>
+    <button id="face-forward" class="small">Face Forward</button>
+    <button id="turn-right" class="small">Turn Right ▶</button>
+  </div>
+
+  <div class="note" id="note">Tip: Walk (or press Simulate Step). Use device orientation for heading or turn with buttons. iOS: open over HTTPS and tap "Enable Motion & Orientation".</div>
+
+  <script>
+    (function(){
+      const world = document.getElementById('world');
+      const avatar = document.getElementById('avatar');
+      const stepsEl = document.getElementById('steps');
+      const distanceEl = document.getElementById('distance');
+      const statusEl = document.getElementById('status');
+      const permBtn = document.getElementById('request-perm');
+      const simulateBtn = document.getElementById('simulate-step');
+      const resetBtn = document.getElementById('reset');
+      const compassArrow = document.getElementById('compassArrow');
+      const headingDisplay = document.getElementById('headingDisplay');
+      const turnLeftBtn = document.getElementById('turn-left');
+      const turnRightBtn = document.getElementById('turn-right');
+      const faceForwardBtn = document.getElementById('face-forward');
+
+      // world/viewport dimensions
+      const viewport = document.getElementById('viewport');
+
+      // state in px
+      let posX = 800; // start somewhere inside the world
+      let posY = 800;
+      const pxPerMeter = 60; // scaling for steps -> px
+
+      // step detection state
+      let stepCount = 0;
+      let distanceMeters = 0;
+      let lastMag = 0;
+      let lastStepTime = 0;
+      const minStepInterval = 300; // ms
+      let threshold = 1.2;
+      let listeningMotion = false;
+      let listeningOrient = false;
+
+      // heading in degrees: 0 = east (right on screen), 90 = south (down), 180 = west, 270 = north
+      // We'll display 0..359
+      let heading = 0; // degrees
+      let usingDeviceOrientation = false;
+
+      function updateHUD(){
+        stepsEl.textContent = stepCount;
+        distanceEl.textContent = distanceMeters.toFixed(2);
+        headingDisplay.textContent = `Heading: ${Math.round(heading)}°`;
+        compassArrow.style.transform = `rotate(${heading}deg)`;
+      }
+
+      function clampPosition(){
+        const maxX = world.offsetWidth - viewport.clientWidth/2;
+        const maxY = world.offsetHeight - viewport.clientHeight/2;
+        const minX = viewport.clientWidth/2;
+        const minY = viewport.clientHeight/2;
+        if (posX < minX) posX = minX;
+        if (posY < minY) posY = minY;
+        if (posX > maxX) posX = maxX;
+        if (posY > maxY) posY = maxY;
+      }
+
+      function render(){
+        clampPosition();
+        // translate world so the avatar (center of viewport) corresponds to posX,posY
+        const tx = Math.round(viewport.clientWidth/2 - posX);
+        const ty = Math.round(viewport.clientHeight/2 - posY);
+        world.style.transform = `translate(${tx}px, ${ty}px)`;
+        // rotate avatar to face heading
+        avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg)`;
+      }
+
+      function stepAnimation(){
+        avatar.style.transition = 'transform 120ms linear';
+        avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg) translateY(-8px)`;
+        setTimeout(()=> {
+          avatar.style.transition = 'transform 220ms cubic-bezier(.2,.9,.2,1)';
+          avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg) translateY(0)`;
+        }, 140);
+      }
+
+      function onStepDetected(strideMeters = 0.75){
+        const now = Date.now();
+        if (now - lastStepTime < minStepInterval) return;
+        lastStepTime = now;
+
+        stepCount += 1;
+        distanceMeters += strideMeters;
+
+        // compute movement vector based on heading
+        const rad = heading * Math.PI / 180;
+        const movePx = strideMeters * pxPerMeter;
+        posX += Math.cos(rad) * movePx;
+        posY += Math.sin(rad) * movePx;
+
+        updateHUD();
+        stepAnimation();
+        render();
+      }
+
+      // simple accelerometer peak detection
+      function handleMotion(e){
+        const a = e.acceleration || e.accelerationIncludingGravity;
+        if (!a) return;
+        const ax = a.x || 0;
+        const ay = a.y || 0;
+        const az = a.z || 0;
+        const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+        const delta = Math.abs(mag - lastMag);
+        if (delta > threshold){
+          onStepDetected(0.7 + Math.random()*0.35);
+        }
+        lastMag = mag;
+      }
+
+      // DeviceOrientation: read alpha (compass) when available
+      function handleOrientation(e){
+        // e.alpha is rotation around z axis in degrees
+        // Many devices report alpha differently (reference frames). For demo, use alpha as heading.
+        let alpha = e.alpha;
+        if (alpha == null) return;
+        // On some devices alpha is 0 when device faces north; on others it's different.
+        // We'll use alpha directly but allow user to override with faceForward button to set a local offset.
+        // Normalize to 0..360 and convert so 0 = east so it matches our expected coordinate system:
+        // By default alpha=0 is device pointing north. We want 0 deg = east, so add 90 deg and invert if needed.
+        // This is a demo; we'll simply map such that when device points to screen's right, heading=0.
+        // A simple approach: heading = (90 - alpha + 360) % 360
+        const newHeading = (90 - alpha + 360) % 360;
+        heading = newHeading;
+        usingDeviceOrientation = true;
+        updateHUD();
+        render();
+      }
+
+      // iOS permission handling for both device motion and orientation
+      async function requestPermissions(){
+        // Some iOS versions require separate requests for DeviceMotionEvent and DeviceOrientationEvent
+        try {
+          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            const resp = await DeviceMotionEvent.requestPermission();
+            if (resp === 'granted') {
+              startMotion();
+            } else {
+              statusEl.textContent = 'Sensor: motion permission denied';
+            }
+          } else {
+            startMotion();
+          }
+        } catch (err) {
+          console.error('motion permission error', err);
+          statusEl.textContent = 'Sensor: motion permission error';
+        }
+
+        try {
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const resp2 = await DeviceOrientationEvent.requestPermission();
+            if (resp2 === 'granted') {
+              startOrientation();
+            } else {
+              statusEl.textContent = (statusEl.textContent || '') + ' | orientation denied';
+            }
+          } else {
+            startOrientation();
+          }
+        } catch (err) {
+          console.error('orientation permission error', err);
+          statusEl.textContent = (statusEl.textContent || '') + ' | orientation permission error';
+        }
+
+        // hide permission button if any permission granted
+        if (listeningMotion || listeningOrient) permBtn.style.display = 'none';
+      }
+
+      function startMotion(){
+        if (listeningMotion) return;
+        if ('ondevicemotion' in window) {
+          window.addEventListener('devicemotion', handleMotion, {passive:true});
+          listeningMotion = true;
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'Motion: listening';
+        } else {
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'Motion: not available';
+        }
+      }
+
+      function startOrientation(){
+        if (listeningOrient) return;
+        if ('ondeviceorientation' in window) {
+          window.addEventListener('deviceorientation', handleOrientation, {passive:true});
+          listeningOrient = true;
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'Orientation: listening';
+        } else {
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'Orientation: not available';
+        }
+      }
+
+      function stopAll(){
+        if (listeningMotion) window.removeEventListener('devicemotion', handleMotion);
+        if (listeningOrient) window.removeEventListener('deviceorientation', handleOrientation);
+        listeningMotion = false; listeningOrient = false;
+        statusEl.textContent = 'Sensor: stopped';
+      }
+
+      // Controls
+      simulateBtn.addEventListener('click', ()=> onStepDetected(0.75));
+      permBtn.addEventListener('click', requestPermissions);
+      resetBtn.addEventListener('click', ()=>{
+        posX = 800; posY = 800; stepCount = 0; distanceMeters = 0; updateHUD(); render();
+      });
+
+      turnLeftBtn.addEventListener('click', ()=>{
+        heading = (heading - 15 + 360) % 360;
+        usingDeviceOrientation = false;
+        updateHUD(); render();
+      });
+      turnRightBtn.addEventListener('click', ()=>{
+        heading = (heading + 15) % 360;
+        usingDeviceOrientation = false;
+        updateHUD(); render();
+      });
+      faceForwardBtn.addEventListener('click', ()=>{
+        // Align "forward" to device orientation (if available) or to 0 degrees
+        if (usingDeviceOrientation) {
+          // leave heading as-is (already following device orientation)
+        } else {
+          heading = 0; // face east / to the right as default forward
+        }
+        updateHUD(); render();
+      });
+
+      // Keyboard fallback for desktop
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.key === 'ArrowRight') { heading = (heading + 10) % 360; usingDeviceOrientation = false; updateHUD(); render(); }
+        if (ev.key === 'ArrowLeft') { heading = (heading - 10 + 360) % 360; usingDeviceOrientation = false; updateHUD(); render(); }
+        if (ev.key === ' ') { onStepDetected(0.75); } // space simulates step
+        if (ev.key === 'ArrowUp') { onStepDetected(0.75); }
+        if (ev.key === 'ArrowDown') { posX -= Math.cos(heading*Math.PI/180) * 40; posY -= Math.sin(heading*Math.PI/180) * 40; render(); }
+      });
+
+      // Attempt to start sensors automatically on non-iOS where permission isn't required
+      if (!(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')) {
+        startMotion();
+      } else {
+        statusEl.textContent = 'Sensor: tap "Enable Motion & Orientation (iOS)" (HTTPS required)';
+      }
+      if (!(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')) {
+        startOrientation();
+      }
+
+      // long-press status to tune threshold (same convenience as before)
+      let longpressTimer;
+      statusEl.addEventListener('pointerdown', ()=>{
+        longpressTimer = setTimeout(()=>{
+          const v = prompt('Adjust step detection threshold (current '+threshold+'). Lower=more sensitive. Typical: 0.8–2.5', String(threshold));
+          const nv = parseFloat(v);
+          if (!isNaN(nv)) { threshold = nv; alert('threshold set to '+threshold); }
+        }, 700);
+      });
+      statusEl.addEventListener('pointerup', ()=> clearTimeout(longpressTimer));
+      statusEl.addEventListener('pointerleave', ()=> clearTimeout(longpressTimer));
+
+      // initialize render and HUD
+      updateHUD(); render();
+
+      // console hint
+      console.info('Walk-to-Navigate with direction: Request permissions on iOS. Use orientation or on-screen buttons to set heading, and steps move in that heading.')
+    })();
+  </script>
+</body>
+</html>
