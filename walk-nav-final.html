@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Walk Navigation — Direction + Background</title>
+  <style>
+    :root{
+      --bg-top: #bde9ff;
+      --bg-bottom: #e8fff0;
+      --hud-bg: rgba(0,0,0,0.6);
+      --hud-color: #fff;
+      --accent: #007aff;
+      --ground: #d8f0c8;
+      --marker: #ff5252;
+    }
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#222}
+    body{
+      background: linear-gradient(180deg,var(--bg-top) 0%, #f3fff6 55%, var(--bg-bottom) 100%);
+      overflow:hidden;
+    }
+
+    /* Viewport & world */
+    .viewport{position:relative;width:100%;height:100%;overflow:hidden;touch-action:none}
+    .world{
+      position:absolute;left:0;top:0;height:2400px;width:4800px; /* large 2D world */
+      background-color: #eafaf2;
+      /* visible tiled "map" background using SVG data URI so it's self-contained */
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 0 2px, transparent 3px),
+        linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px),
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 40px, rgba(0,0,0,0.01) 40px 80px);
+      background-size: 140px 140px, 20px 20px, 100% 100%;
+      box-shadow: inset 0 0 120px rgba(0,0,0,0.04);
+      transition: transform 120ms linear;
+      will-change: transform;
+    }
+
+    /* scenery */
+    .poi{position:absolute;width:140px;height:100px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,0.06)}
+    .ground-strip{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,var(--ground),#c5e99e);border-top:4px solid rgba(0,0,0,0.06)}
+
+    /* avatar centered visually in viewport */
+    .avatar{
+      position:absolute;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%) rotate(0deg);z-index:50;will-change:transform;pointer-events:none;
+    }
+    .avatar svg{display:block}
+
+    /* destination marker */
+    .dest{
+      position:absolute;width:26px;height:26px;border-radius:50%;background:var(--marker);box-shadow:0 6px 20px rgba(0,0,0,0.18);transform:translate(-50%,-50%);z-index:45;pointer-events:none;
+      border:3px solid #fff;
+    }
+
+    /* navigation arrow above avatar showing direction to destination */
+    .nav-arrow{
+      position:fixed;left:50%;top:calc(50% - 70px);width:48px;height:48px;margin-left:-24px;z-index:60;pointer-events:none;
+      transform-origin:center center;transition:transform 160ms linear;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .nav-arrow svg{filter:drop-shadow(0 6px 16px rgba(0,0,0,0.18));}
+
+    /* HUD & controls */
+    .hud{position:fixed;left:12px;top:12px;padding:10px 12px;background:var(--hud-bg);color:var(--hud-color);border-radius:10px;font-size:14px;z-index:70;backdrop-filter: blur(6px)}
+    .controls{position:fixed;right:12px;top:12px;z-index:70;display:flex;gap:8px;flex-direction:column}
+    button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;font-weight:700;box-shadow:0 6px 14px rgba(0,0,0,0.08)}
+    .small{padding:6px 8px;font-size:13px}
+    .note{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:999px;font-size:13px;z-index:70}
+
+    .info-row{margin-top:6px;font-size:13px;display:flex;gap:8px;align-items:center}
+    .toggle{background:rgba(255,255,255,0.08);padding:6px 8px;border-radius:8px;color:#fff;border:0;font-weight:600}
+    @media (max-width:420px){
+      .poi{width:110px;height:80px}
+      .world{width:3600px;height:2000px}
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport" id="viewport">
+    <div class="world" id="world" aria-hidden="false">
+      <!-- sample POIs placed around the world -->
+      <div class="poi" style="left:260px;top:420px">Cafe</div>
+      <div class="poi" style="left:760px;top:280px">Park</div>
+      <div class="poi" style="left:1200px;top:760px">Shop</div>
+      <div class="poi" style="left:2000px;top:440px">Library</div>
+      <div class="poi" style="left:3200px;top:900px">Station</div>
+
+      <div class="ground-strip" aria-hidden="true"></div>
+    </div>
+
+    <!-- avatar remains centered in viewport -->
+    <div class="avatar" id="avatar" title="You (tap Turn buttons or enable orientation)">
+      <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+        <g>
+          <circle cx="32" cy="10" r="6.2" fill="#ffcc66"/>
+          <path d="M22 52c0-4 5-10 10-10s10 6 10 10" fill="#ffcc66"/>
+          <path d="M18 26c3 0 5-2.4 5-5.2S21 15.6 18 15.6 13 18 13 20.8 15 26 18 26z" fill="#ff7a66"/>
+          <path d="M34 24l6 6-3 6" stroke="#333" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" fill="none" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- destination marker (positioned in world coordinates) -->
+    <div class="dest" id="dest" style="display:none;"></div>
+  </div>
+
+  <!-- navigation arrow above avatar, points to destination bearing -->
+  <div class="nav-arrow" id="navArrow" aria-hidden="true" title="Direction to destination">
+    <svg viewBox="0 0 24 24" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2 L18 20 L12 16 L6 20 Z" fill="var(--accent)"/>
+    </svg>
+  </div>
+
+  <div class="hud" id="hud">
+    <div>Steps: <strong id="steps">0</strong></div>
+    <div>Distance: <strong id="distance">0.00</strong> m</div>
+    <div class="info-row">
+      <div>Bearing: <strong id="bearing">—</strong>°</div>
+      <div id="status" style="opacity:0.95">Sensor: unknown</div>
+    </div>
+    <div class="info-row" style="margin-top:6px">
+      <button id="toggleNav" class="toggle">Navigate: Off</button>
+      <button id="recenter" class="toggle">Recenter</button>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <button id="request-perm" class="small">Enable Motion & Orientation (iOS)</button>
+    <button id="simulate-step" class="small">Simulate Step</button>
+    <button id="reset" class="small">Reset</button>
+  </div>
+
+  <div class="note" id="note">Tip: Tap anywhere on the map to set a destination. Walk (or press Simulate Step). Toggle Navigate to auto-face destination when walking.</div>
+
+  <script>
+    (function(){
+      // Elements
+      const viewport = document.getElementById('viewport');
+      const world = document.getElementById('world');
+      const avatar = document.getElementById('avatar');
+      const destEl = document.getElementById('dest');
+      const navArrow = document.getElementById('navArrow');
+      const stepsEl = document.getElementById('steps');
+      const distanceEl = document.getElementById('distance');
+      const bearingEl = document.getElementById('bearing');
+      const statusEl = document.getElementById('status');
+      const permBtn = document.getElementById('request-perm');
+      const simulateBtn = document.getElementById('simulate-step');
+      const resetBtn = document.getElementById('reset');
+      const toggleNavBtn = document.getElementById('toggleNav');
+      const recenterBtn = document.getElementById('recenter');
+
+      // World / position state (px)
+      let posX = 1200; // starting world coordinates (center of viewport corresponds to these)
+      let posY = 700;
+      const pxPerMeter = 60; // scale
+
+      // Step detection
+      let stepCount = 0;
+      let distanceMeters = 0;
+      let lastMag = 0;
+      let lastStepTime = 0;
+      const minStepInterval = 300;
+      let threshold = 1.2;
+      let listeningMotion = false;
+      let listeningOrient = false;
+
+      // Heading & navigation
+      let heading = 0; // degrees, 0 = right/east
+      let destination = null; // {x, y} in world px coords
+      let navigating = false; // auto-face destination when on
+      const arrivalThresholdMeters = 1.2; // within ~1.2m considered arrived
+
+      // UTIL: clamp world position to bounds so camera doesn't show empty edges
+      function clampPosition(){
+        const minX = viewport.clientWidth/2;
+        const minY = viewport.clientHeight/2;
+        const maxX = world.offsetWidth - viewport.clientWidth/2;
+        const maxY = world.offsetHeight - viewport.clientHeight/2;
+        if (posX < minX) posX = minX;
+        if (posY < minY) posY = minY;
+        if (posX > maxX) posX = maxX;
+        if (posY > maxY) posY = maxY;
+      }
+
+      // Render: translate world so avatar stays centered, rotate avatar to heading
+      function render(){
+        clampPosition();
+        const tx = Math.round(viewport.clientWidth/2 - posX);
+        const ty = Math.round(viewport.clientHeight/2 - posY);
+        world.style.transform = `translate(${tx}px, ${ty}px)`;
+        avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg)`;
+        updateNavArrow();
+        updateDestMarker();
+      }
+
+      // Update HUD
+      function updateHUD(){
+        stepsEl.textContent = stepCount;
+        distanceEl.textContent = distanceMeters.toFixed(2);
+        bearingEl.textContent = destination ? Math.round(bearingTo(destination.x, destination.y)) : '—';
+        statusEl.textContent = `Nav: ${navigating ? 'on' : 'off'} | Sensors: ${listeningMotion ? 'motion' : '-'} ${listeningOrient ? '/ orient' : ''}`;
+        toggleNavBtn.textContent = `Navigate: ${navigating ? 'On' : 'Off'}`;
+      }
+
+      // Compute bearing (deg) from current pos to target (0 = East/right)
+      function bearingTo(tx, ty){
+        const dx = tx - posX;
+        const dy = ty - posY;
+        const rad = Math.atan2(dy, dx); // -PI..PI, 0 = +x axis (east)
+        let deg = rad * 180/Math.PI;
+        if (deg < 0) deg += 360;
+        return deg;
+      }
+
+      // Compute distance in meters
+      function distanceTo(tx, ty){
+        const dx = tx - posX;
+        const dy = ty - posY;
+        const px = Math.sqrt(dx*dx + dy*dy);
+        return px / pxPerMeter;
+      }
+
+      // Update destination marker DOM position (world coords -> translated by world transform)
+      function updateDestMarker(){
+        if (!destination) { destEl.style.display = 'none'; return; }
+        destEl.style.display = 'block';
+        destEl.style.left = destination.x + 'px';
+        destEl.style.top = destination.y + 'px';
+      }
+
+      // Update navigation arrow rotation so it points to destination (world bearing)
+      // Arrow is fixed to viewport (above avatar), so rotate by bearing degrees
+      function updateNavArrow(){
+        if (!destination) { navArrow.style.opacity = 0.2; navArrow.style.transform = `rotate(${heading}deg)`; return; }
+        const b = bearingTo(destination.x, destination.y);
+        // Show arrow pointing to destination relative to screen: just rotate to bearing
+        navArrow.style.opacity = 1;
+        navArrow.style.transform = `rotate(${b}deg)`;
+      }
+
+      // Step animation and movement: when a step is detected, move in current heading
+      function stepAnimation(){
+        avatar.style.transition = 'transform 120ms linear';
+        avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg) translateY(-10px)`;
+        setTimeout(()=> {
+          avatar.style.transition = 'transform 260ms cubic-bezier(.2,.9,.2,1)';
+          avatar.style.transform = `translate(-50%,-50%) rotate(${heading}deg) translateY(0)`;
+        }, 140);
+      }
+
+      function onStepDetected(strideMeters = 0.75){
+        const now = Date.now();
+        if (now - lastStepTime < minStepInterval) return;
+        lastStepTime = now;
+
+        // If navigating auto-face destination
+        if (navigating && destination) {
+          heading = bearingTo(destination.x, destination.y);
+        }
+
+        stepCount += 1;
+        distanceMeters += strideMeters;
+
+        // Move position in heading direction
+        const rad = heading * Math.PI/180;
+        const movePx = strideMeters * pxPerMeter;
+        posX += Math.cos(rad) * movePx;
+        posY += Math.sin(rad) * movePx;
+
+        // If destination exists check arrival
+        if (destination) {
+          const dist = distanceTo(destination.x, destination.y);
+          if (dist <= arrivalThresholdMeters) {
+            // arrived
+            destination = null;
+            destEl.style.display = 'none';
+            navArrow.style.opacity = 0.2;
+            alert('Arrived at destination');
+          }
+        }
+
+        updateHUD();
+        stepAnimation();
+        render();
+      }
+
+      // Motion listener (simple peak detection on magnitude)
+      function handleMotion(e){
+        const a = e.acceleration || e.accelerationIncludingGravity;
+        if (!a) return;
+        const ax = a.x || 0;
+        const ay = a.y || 0;
+        const az = a.z || 0;
+        const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+        const delta = Math.abs(mag - lastMag);
+        if (delta > threshold){
+          onStepDetected(0.7 + Math.random()*0.35);
+        }
+        lastMag = mag;
+      }
+
+      // Orientation listener (map device alpha to our heading where 0 = East)
+      function handleOrientation(e){
+        let alpha = e.alpha;
+        if (alpha == null) return;
+        // Map device alpha (0 = north) to our system (0 = east)
+        heading = (90 - alpha + 360) % 360;
+        updateHUD();
+        render();
+      }
+
+      // Permission handling for iOS (both motion & orientation)
+      async function requestPermissions(){
+        try {
+          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            const r = await DeviceMotionEvent.requestPermission();
+            if (r === 'granted') startMotion();
+            else statusEl.textContent = 'Sensor: motion denied';
+          } else {
+            startMotion();
+          }
+        } catch (err) {
+          console.error('motion permission error', err);
+          statusEl.textContent = 'Sensor: motion error';
+        }
+
+        try {
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const r2 = await DeviceOrientationEvent.requestPermission();
+            if (r2 === 'granted') startOrientation();
+            else statusEl.textContent = (statusEl.textContent || '') + ' | orientation denied';
+          } else {
+            startOrientation();
+          }
+        } catch (err) {
+          console.error('orientation permission error', err);
+          statusEl.textContent = (statusEl.textContent || '') + ' | orient error';
+        }
+
+        if (listeningMotion || listeningOrient) permBtn.style.display = 'none';
+        updateHUD();
+      }
+
+      function startMotion(){
+        if (listeningMotion) return;
+        if ('ondevicemotion' in window) {
+          window.addEventListener('devicemotion', handleMotion, {passive:true});
+          listeningMotion = true;
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'motion';
+        } else {
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'no motion';
+        }
+        updateHUD();
+      }
+
+      function startOrientation(){
+        if (listeningOrient) return;
+        if ('ondeviceorientation' in window) {
+          window.addEventListener('deviceorientation', handleOrientation, {passive:true});
+          listeningOrient = true;
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'orientation';
+        } else {
+          statusEl.textContent = (statusEl.textContent ? statusEl.textContent + ' | ' : '') + 'no orientation';
+        }
+        updateHUD();
+      }
+
+      // UI event handlers
+      simulateBtn.addEventListener('click', ()=> onStepDetected(0.75));
+      permBtn.addEventListener('click', requestPermissions);
+      resetBtn.addEventListener('click', ()=>{
+        posX = world.offsetWidth/2; posY = world.offsetHeight/2; stepCount = 0; distanceMeters = 0; destination = null;
+        updateHUD(); render();
+      });
+      toggleNavBtn.addEventListener('click', ()=> { navigating = !navigating; updateHUD(); });
+
+      recenterBtn.addEventListener('click', ()=> { // recenter camera to current pos
+        render();
+      });
+
+      // Click/tap on viewport to set destination (map coords)
+      function viewportToWorld(clientX, clientY){
+        // Translate screen coords -> world coords based on current camera (posX,posY)
+        const viewCenterX = viewport.clientWidth/2;
+        const viewCenterY = viewport.clientHeight/2;
+        const worldX = posX + (clientX - viewCenterX);
+        const worldY = posY + (clientY - viewCenterY);
+        // clamp to world bounds
+        return {
+          x: Math.max(10, Math.min(world.offsetWidth-10, Math.round(worldX))),
+          y: Math.max(10, Math.min(world.offsetHeight-10, Math.round(worldY)))
+        };
+      }
+
+      viewport.addEventListener('pointerdown', (ev)=>{
+        // exclude pointer events that start on UI buttons by checking target
+        if (ev.target.closest('.hud') || ev.target.closest('.controls') ) return;
+        const w = viewportToWorld(ev.clientX, ev.clientY);
+        destination = {x: w.x, y: w.y};
+        // position dest marker immediately; world transform will keep it visible
+        updateDestMarker();
+        // compute bearing and show
+        const b = bearingTo(destination.x, destination.y);
+        // optionally auto set heading if navigating on
+        if (navigating) heading = b;
+        updateHUD();
+        render();
+      });
+
+      // Keyboard fallbacks (desktop)
+      window.addEventListener('keydown', (ev)=>{
+        if (ev.key === ' ') { onStepDetected(0.75); ev.preventDefault(); }
+        if (ev.key === 'ArrowUp') onStepDetected(0.75);
+        if (ev.key === 'ArrowLeft') { heading = (heading - 10 + 360) % 360; updateHUD(); render(); }
+        if (ev.key === 'ArrowRight') { heading = (heading + 10) % 360; updateHUD(); render(); }
+      });
+
+      // Initial auto-start sensors when permissions are not required (non-iOS)
+      if (!(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')) {
+        startMotion();
+      } else {
+        statusEl.textContent = 'Tap "Enable Motion & Orientation" (HTTPS required on iOS)';
+      }
+      if (!(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')) {
+        startOrientation();
+      }
+
+      // Long-press status to tune threshold
+      let longpressTimer;
+      statusEl.addEventListener('pointerdown', ()=>{
+        longpressTimer = setTimeout(()=>{
+          const v = prompt('Adjust step detection threshold (current '+threshold+'). Lower=more sensitive. Typical: 0.8–2.5', String(threshold));
+          const nv = parseFloat(v);
+          if (!isNaN(nv)) { threshold = nv; alert('threshold set to '+threshold); }
+        }, 700);
+      });
+      statusEl.addEventListener('pointerup', ()=> clearTimeout(longpressTimer));
+      statusEl.addEventListener('pointerleave', ()=> clearTimeout(longpressTimer));
+
+      // Initialize state & render
+      posX = Math.max(viewport.clientWidth/2 + 20, Math.min(world.offsetWidth - viewport.clientWidth/2 - 20, posX));
+      posY = Math.max(viewport.clientHeight/2 + 20, Math.min(world.offsetHeight - viewport.clientHeight/2 - 20, posY));
+      updateHUD();
+      render();
+
+      // Console hint
+      console.info('Walk Navigation demo: Tap the map to set a destination. Toggle Navigate to auto-face destination when walking. Use "Simulate Step" or device motion to move.');
+
+    })();
+  </script>
+</body>
+</html>
