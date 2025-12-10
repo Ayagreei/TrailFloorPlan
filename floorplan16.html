@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Plan Navigator - Desktop & Mobile</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* All CSS styles remain exactly as before */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .app {
+            width: 100vw;
+            height: 100vh;
+            background-color: #f3f4f6;
+            display: flex;
+        }
+        .sidebar {
+            width: 320px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .canvas-container {
+            background: white;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            overflow: auto;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        canvas {
+            display: block;
+            max-width: none;
+            max-height: none;
+            transition: transform 0.2s ease;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0.375rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:hover {
+            background: #f3f4f6;
+        }
+        .zoom-level {
+            min-width: 60px;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .btn-warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+        .btn-info {
+            background-color: #06b6d4;
+            color: white;
+        }
+        .btn-info:hover {
+            background-color: #0891b2;
+        }
+        .mode-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .mode-btn.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .mode-btn.train.active {
+            background-color: #10b981;
+        }
+        .mode-btn.navigate.active {
+            background-color: #ef4444;
+        }
+        .mode-btn.disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .section {
+            margin-bottom: 1.5rem;
+        }
+        .path-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            background-color: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .path-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .path-item:hover {
+            background-color: #e5e7eb;
+        }
+        .path-item.active {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+        }
+        .path-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .path-action-btn {
+            padding: 0.25rem;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scroll-container {
+            max-height: 160px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.25rem;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+        }
+        .training-panel, .navigation-panel {
+            background-color: #ecfdf5;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #a7f3d0;
+            margin-bottom: 1rem;
+        }
+        .navigation-panel {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+        }
+        .edit-path-panel {
+            background-color: #fef7cd;
+            border: 2px solid #f59e0b;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .add-location-panel {
+            background-color: #eff6ff;
+            border: 2px solid #93c5fd;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .login-panel {
+            background-color: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .admin-indicator {
+            background-color: #10b981;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        .instruction-text {
+            font-size: 0.875rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .distance-indicator {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-success {
+            background-color: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-error {
+            background-color: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .instructions-panel {
+            background-color: #fffbeb;
+            border: 2px solid #fcd34d;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .instruction-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
+        }
+        .instruction-number {
+            background: #3b82f6;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .instruction-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .instruction-actions {
+            display: flex;
+            gap: 0.25rem;
+            flex-shrink: 0;
+        }
+        .instruction-edit-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .instruction-edit-btn:hover {
+            background: #4b5563;
+        }
+        .instruction-delete-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+        .instruction-delete-btn:hover {
+            background: #dc2626;
+        }
+        .add-instruction-btn {
+            width: 100%;
+            padding: 0.5rem;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .add-instruction-btn:hover {
+            background: #059669;
+        }
+        .edit-instruction-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px solid #3b82f6;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .upload-area {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem;
+        }
+        
+        /* Motion & Simulation styles */
+        .motion-panel, .simulation-panel {
+            background-color: #f5f3ff;
+            border: 2px solid #8b5cf6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .simulation-panel {
+            background-color: #fffbeb;
+            border-color: #f59e0b;
+        }
+        .status-indicator {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status-simulation {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-inactive {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        .status-on-path {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .status-off-path {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .data-item {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+        }
+        .data-label {
+            font-size: 0.625rem;
+            color: #6b7280;
+            margin-bottom: 0.125rem;
+        }
+        .data-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .step-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            color: white;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .step-count {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .direction-display {
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .control-btn {
+            padding: 0.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn:hover {
+            background: #2563eb;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn.up { grid-column: 2; grid-row: 1; }
+        .control-btn.down { grid-column: 2; grid-row: 3; }
+        .control-btn.left { grid-column: 1; grid-row: 2; }
+        .control-btn.right { grid-column: 3; grid-row: 2; }
+        .control-btn.center { grid-column: 2; grid-row: 2; background: #6b7280; }
+        
+        .flex {
+            display: flex;
+        }
+        .gap-2 {
+            gap: 0.5rem;
+        }
+        .gap-1 {
+            gap: 0.25rem;
+        }
+        .w-full {
+            width: 100%;
+        }
+        .flex-1 {
+            flex: 1;
+        }
+        .justify-between {
+            justify-content: space-between;
+        }
+        .items-center {
+            align-items: center;
+        }
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+        .p-2 {
+            padding: 0.5rem;
+        }
+        .p-3 {
+            padding: 0.75rem;
+        }
+        .p-4 {
+            padding: 1rem;
+        }
+        .px-2 {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        .px-3 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .py-1 {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+        .rounded {
+            border-radius: 0.375rem;
+        }
+        .bg-gray-100 {
+            background-color: #f3f4f6;
+        }
+        .bg-gray-200 {
+            background-color: #e5e7eb;
+        }
+        .bg-blue-50 {
+            background-color: #eff6ff;
+        }
+        .bg-blue-500 {
+            background-color: #3b82f6;
+        }
+        .bg-green-50 {
+            background-color: #ecfdf5;
+        }
+        .bg-green-500 {
+            background-color: #10b981;
+        }
+        .bg-red-50 {
+            background-color: #fef2f2;
+        }
+        .bg-red-500 {
+            background-color: #ef4444;
+        }
+        .bg-purple-500 {
+            background-color: #8b5cf6;
+        }
+        .bg-purple-600 {
+            background-color: #7c3aed;
+        }
+        .bg-yellow-50 {
+            background-color: #fffbeb;
+        }
+        .bg-yellow-500 {
+            background-color: #f59e0b;
+        }
+        .text-white {
+            color: white;
+        }
+        .text-gray-600 {
+            color: #4b5563;
+        }
+        .text-gray-800 {
+            color: #1f2937;
+        }
+        .border {
+            border: 1px solid #d1d5db;
+        }
+        .border-2 {
+            border-width: 2px;
+        }
+        .border-blue-300 {
+            border-color: #93c5fd;
+        }
+        .cursor-crosshair {
+            cursor: crosshair;
+        }
+        .cursor-default {
+            cursor: default;
+        }
+        .cursor-grab {
+            cursor: grab;
+        }
+        .cursor-grabbing {
+            cursor: grabbing;
+        }
+        .hidden {
+            display: none;
+        }
+        
+        /* Path tracking styles */
+        .path-progress {
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+        .path-progress-fill {
+            height: 100%;
+            background-color: #10b981;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .path-deviation {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
+        }
+        .deviation-low {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .deviation-medium {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .deviation-high {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Step Counter Display */
+        .step-counter-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 0.5rem;
+            border: 2px solid #3b82f6;
+            padding: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            min-width: 200px;
+        }
+        .step-counter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .step-counter-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .step-counter-badge {
+            background: #3b82f6;
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .step-counter-value {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        .step-counter-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .step-counter-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .step-counter-stat {
+            background: #f3f4f6;
+            padding: 0.375rem;
+            border-radius: 0.25rem;
+            text-align: center;
+        }
+        .step-counter-stat-label {
+            color: #6b7280;
+            margin-bottom: 0.125rem;
+        }
+        .step-counter-stat-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .step-animation {
+            animation: stepPulse 0.3s ease;
+        }
+        @keyframes stepPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Simple icon replacements */
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+        .icon-upload::before { content: "📤"; }
+        .icon-save::before { content: "💾"; }
+        .icon-navigation::before { content: "🧭"; }
+        .icon-trash::before { content: "🗑️"; }
+        .icon-pin::before { content: "📍"; }
+        .icon-play::before { content: "▶️"; }
+        .icon-zoom-in::before { content: "➕"; }
+        .icon-zoom-out::before { content: "➖"; }
+        .icon-reset::before { content: "🔄"; }
+        .icon-edit::before { content: "✏️"; }
+        .icon-add::before { content: "➕"; }
+        .icon-load::before { content: "📥"; }
+        .icon-login::before { content: "🔐"; }
+        .icon-logout::before { content: "🚪"; }
+        .icon-walk::before { content: "🚶"; }
+        .icon-motion::before { content: "📱"; }
+        .icon-step::before { content: "👣"; }
+        .icon-keyboard::before { content: "⌨️"; }
+        .icon-mouse::before { content: "🖱️"; }
+        .icon-arrow-up::before { content: "⬆️"; }
+        .icon-arrow-down::before { content: "⬇️"; }
+        .icon-arrow-left::before { content: "⬅️"; }
+        .icon-arrow-right::before { content: "➡️"; }
+        .icon-click::before { content: "👆"; }
+        .icon-path::before { content: "🛤️"; }
+        .icon-target::before { content: "🎯"; }
+        
+        /* JSON File Management Styles */
+        .file-management-panel {
+            background-color: #f5f3ff;
+            border: 2px solid #8b5cf6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .file-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .status-loaded {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status-not-loaded {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .file-info {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        .file-url-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // Simple icon components
+        const UploadIcon = () => React.createElement('span', { className: 'icon icon-upload' });
+        const SaveIcon = () => React.createElement('span', { className: 'icon icon-save' });
+        const NavigationIcon = () => React.createElement('span', { className: 'icon icon-navigation' });
+        const TrashIcon = () => React.createElement('span', { className: 'icon icon-trash' });
+        const PinIcon = () => React.createElement('span', { className: 'icon icon-pin' });
+        const PlayIcon = () => React.createElement('span', { className: 'icon icon-play' });
+        const ZoomInIcon = () => React.createElement('span', { className: 'icon icon-zoom-in' });
+        const ZoomOutIcon = () => React.createElement('span', { className: 'icon icon-zoom-out' });
+        const ResetZoomIcon = () => React.createElement('span', { className: 'icon icon-reset' });
+        const EditIcon = () => React.createElement('span', { className: 'icon icon-edit' });
+        const AddIcon = () => React.createElement('span', { className: 'icon icon-add' });
+        const LoadIcon = () => React.createElement('span', { className: 'icon icon-load' });
+        const LoginIcon = () => React.createElement('span', { className: 'icon icon-login' });
+        const LogoutIcon = () => React.createElement('span', { className: 'icon icon-logout' });
+        const WalkIcon = () => React.createElement('span', { className: 'icon icon-walk' });
+        const MotionIcon = () => React.createElement('span', { className: 'icon icon-motion' });
+        const StepIcon = () => React.createElement('span', { className: 'icon icon-step' });
+        const KeyboardIcon = () => React.createElement('span', { className: 'icon icon-keyboard' });
+        const MouseIcon = () => React.createElement('span', { className: 'icon icon-mouse' });
+        const ArrowUpIcon = () => React.createElement('span', { className: 'icon icon-arrow-up' });
+        const ArrowDownIcon = () => React.createElement('span', { className: 'icon icon-arrow-down' });
+        const ArrowLeftIcon = () => React.createElement('span', { className: 'icon icon-arrow-left' });
+        const ArrowRightIcon = () => React.createElement('span', { className: 'icon icon-arrow-right' });
+        const ClickIcon = () => React.createElement('span', { className: 'icon icon-click' });
+        const PathIcon = () => React.createElement('span', { className: 'icon icon-path' });
+        const TargetIcon = () => React.createElement('span', { className: 'icon icon-target' });
+        const DownloadIcon = () => React.createElement('span', { className: 'icon' }, '📥');
+        const UploadIcon2 = () => React.createElement('span', { className: 'icon' }, '📤');
+
+        const FloorPlanNavigator = () => {
+            // === JSON FILE MANAGEMENT STATE ===
+            const [jsonFileUrl, setJsonFileUrl] = useState('floor14_data.json');
+            const [jsonFileStatus, setJsonFileStatus] = useState('not-loaded');
+            const [lastSaved, setLastSaved] = useState(null);
+            const [isSaving, setIsSaving] = useState(false);
+            const [autoSave, setAutoSave] = useState(false);
+            
+            // Existing state
+            const [floorPlan, setFloorPlan] = useState(null);
+            const [mode, setMode] = useState('navigate');
+            const [locations, setLocations] = useState([]);
+            const [paths, setPaths] = useState([]);
+            const [currentPath, setCurrentPath] = useState([]);
+            const [trainingFrom, setTrainingFrom] = useState('');
+            const [trainingTo, setTrainingTo] = useState('');
+            const [navigateFrom, setNavigateFrom] = useState('');
+            const [navigateTo, setNavigateTo] = useState('');
+            const [activePath, setActivePath] = useState(null);
+            const [isNavigating, setIsNavigating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [addingLocation, setAddingLocation] = useState(false);
+            const [newLocationName, setNewLocationName] = useState('');
+            const [pendingLocation, setPendingLocation] = useState(null);
+            
+            // Zoom and pan state
+            const [zoom, setZoom] = useState(1);
+            const [offset, setOffset] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            
+            // Instruction editing state
+            const [instructions, setInstructions] = useState([]);
+            const [editingInstructionIndex, setEditingInstructionIndex] = useState(null);
+            const [editingInstructionText, setEditingInstructionText] = useState('');
+            const [newInstructionText, setNewInstructionText] = useState('');
+            
+            // Path editing state
+            const [editingPathIndex, setEditingPathIndex] = useState(null);
+            const [selectedPathIndex, setSelectedPathIndex] = useState(null);
+            
+            // Admin authentication state
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            
+            // === MOTION TRACKING STATE ===
+            const [isMotionTracking, setIsMotionTracking] = useState(false);
+            const [isSimulationMode, setIsSimulationMode] = useState(false);
+            const [stepCount, setStepCount] = useState(0);
+            const [currentDirection, setCurrentDirection] = useState('N');
+            const [stepLength, setStepLength] = useState(50);
+            const [currentPosition, setCurrentPosition] = useState(null);
+            const [isMotionAvailable, setIsMotionAvailable] = useState(false);
+            const [deviceType, setDeviceType] = useState('desktop');
+            const [isClickToMove, setIsClickToMove] = useState(false);
+            
+            // === PATH TRACKING STATE ===
+            const [pathProgress, setPathProgress] = useState(0);
+            const [distanceTravelled, setDistanceTravelled] = useState(0);
+            const [totalPathDistance, setTotalPathDistance] = useState(0);
+            const [isOnPath, setIsOnPath] = useState(true);
+            const [pathDeviation, setPathDeviation] = useState(0);
+            const [nextWaypoint, setNextWaypoint] = useState(0);
+            
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Admin credentials
+            const ADMIN_CREDENTIALS = {
+                username: 'admin',
+                password: 'admin123'
+            };
+
+            // =============================================
+            // JSON FILE MANAGEMENT FUNCTIONS
+            // =============================================
+            
+            const loadJSONData = async () => {
+                try {
+                    setJsonFileStatus('loading');
+                    console.log(`Loading JSON from: ${jsonFileUrl}`);
+                    
+                    const response = await fetch(jsonFileUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Apply loaded data to state
+                    if (data.locations) {
+                        setLocations(data.locations);
+                        console.log(`Loaded ${data.locations.length} locations from JSON`);
+                    }
+                    
+                    if (data.paths) {
+                        setPaths(data.paths);
+                        console.log(`Loaded ${data.paths.length} paths from JSON`);
+                    }
+                    
+                    if (data.floorPlan) {
+                        setFloorPlan(data.floorPlan);
+                        console.log('Loaded floor plan from JSON');
+                    }
+                    
+                    setJsonFileStatus('loaded');
+                    setLastSaved(new Date().toLocaleTimeString());
+                    
+                    alert(`Successfully loaded data from ${jsonFileUrl}`);
+                    
+                } catch (error) {
+                    console.error('Error loading JSON:', error);
+                    setJsonFileStatus('error');
+                    
+                    // Try to load from localStorage as fallback
+                    try {
+                        const locData = localStorage.getItem('nav-locations');
+                        const pathData = localStorage.getItem('nav-paths');
+                        const planData = localStorage.getItem('nav-floorplan');
+                        
+                        if (locData || pathData || planData) {
+                            if (locData) setLocations(JSON.parse(locData));
+                            if (pathData) setPaths(JSON.parse(pathData));
+                            if (planData) setFloorPlan(JSON.parse(planData));
+                            
+                            alert('Using localStorage data as fallback');
+                            setJsonFileStatus('loaded-from-local');
+                        } else {
+                            alert(`Could not load JSON file: ${error.message}\n\nPlease check the file URL and try again.`);
+                        }
+                    } catch (localError) {
+                        alert(`Could not load data: ${error.message}`);
+                    }
+                }
+            };
+            
+            const saveJSONData = async () => {
+                setIsSaving(true);
+                try {
+                    const dataToSave = {
+                        locations: locations,
+                        paths: paths,
+                        floorPlan: floorPlan,
+                        lastUpdated: new Date().toISOString(),
+                        metadata: {
+                            app: 'Floor Plan Navigator',
+                            version: '1.0',
+                            totalLocations: locations.length,
+                            totalPaths: paths.length
+                        }
+                    };
+                    
+                    // Create download link
+                    const dataStr = JSON.stringify(dataToSave, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = jsonFileUrl.split('/').pop() || 'floor14_data.json';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    // Also save to localStorage as backup
+                    localStorage.setItem('nav-locations', JSON.stringify(locations));
+                    localStorage.setItem('nav-paths', JSON.stringify(paths));
+                    if (floorPlan) localStorage.setItem('nav-floorplan', floorPlan);
+                    
+                    setLastSaved(new Date().toLocaleTimeString());
+                    alert(`Data saved successfully as ${link.download}`);
+                    
+                } catch (error) {
+                    console.error('Error saving data:', error);
+                    alert('Error saving data: ' + error.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+            
+            const updateJSONFileUrl = (newUrl) => {
+                setJsonFileUrl(newUrl);
+                localStorage.setItem('json-file-url', newUrl);
+            };
+            
+            const exportDataAsJSON = () => {
+                const dataToExport = {
+                    locations: locations,
+                    paths: paths,
+                    floorPlan: floorPlan,
+                    exportDate: new Date().toISOString(),
+                    totalLocations: locations.length,
+                    totalPaths: paths.length
+                };
+                
+                const dataStr = JSON.stringify(dataToExport, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'floor14_export_' + new Date().toISOString().split('T')[0] + '.json';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            };
+            
+            const importDataFromFile = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        
+                        if (importedData.locations) {
+                            setLocations(importedData.locations);
+                        }
+                        
+                        if (importedData.paths) {
+                            setPaths(importedData.paths);
+                        }
+                        
+                        if (importedData.floorPlan) {
+                            setFloorPlan(importedData.floorPlan);
+                        }
+                        
+                        alert(`Successfully imported ${importedData.locations?.length || 0} locations and ${importedData.paths?.length || 0} paths`);
+                        setJsonFileStatus('imported');
+                        setLastSaved(new Date().toLocaleTimeString());
+                        
+                    } catch (error) {
+                        alert('Error parsing JSON file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            // =============================================
+            // BASIC APP FUNCTIONS
+            // =============================================
+            
+            const loadData = async () => {
+                // Load saved JSON URL from localStorage
+                const savedUrl = localStorage.getItem('json-file-url');
+                if (savedUrl) {
+                    setJsonFileUrl(savedUrl);
+                }
+                
+                // Check if admin was previously logged in
+                const savedAdmin = localStorage.getItem('nav-admin');
+                if (savedAdmin) {
+                    setIsAdmin(true);
+                }
+            };
+
+            const saveData = async () => {
+                await saveJSONData();
+            };
+
+            useEffect(() => {
+                detectDeviceType();
+                loadData();
+                
+                // Check for motion availability
+                if ('DeviceMotionEvent' in window) {
+                    setIsMotionAvailable(true);
+                }
+            }, []);
+
+            // =============================================
+            // BASIC UI FUNCTIONS
+            // =============================================
+            
+            const detectDeviceType = () => {
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isMobile = /mobile|iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(userAgent);
+                const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
+                
+                if (isMobile && !isTablet) {
+                    setDeviceType('mobile');
+                } else if (isTablet) {
+                    setDeviceType('tablet');
+                } else {
+                    setDeviceType('desktop');
+                }
+            };
+
+            const handleLogin = () => {
+                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPassword('');
+                    localStorage.setItem('nav-admin', 'true');
+                    alert('Admin login successful!');
+                } else {
+                    alert('Invalid credentials');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsAdmin(false);
+                setMode('navigate');
+                localStorage.removeItem('nav-admin');
+                alert('Logged out successfully');
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setFloorPlan(event.target.result);
+                        setZoom(1);
+                        setOffset({ x: 0, y: 0 });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const drawCanvas = () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !floorPlan) return;
+
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const displayWidth = img.width * zoom;
+                    const displayHeight = img.height * zoom;
+                    
+                    canvas.width = displayWidth;
+                    canvas.height = displayHeight;
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(offset.x, offset.y);
+                    
+                    // Draw the image
+                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                    // Draw locations
+                    locations.forEach(loc => {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.beginPath();
+                        ctx.arc(loc.x * zoom, loc.y * zoom, 8 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.fillStyle = '#000';
+                        ctx.font = `${14 * zoom}px Arial`;
+                        ctx.fillText(loc.name, loc.x * zoom + 12 * zoom, loc.y * zoom + 5 * zoom);
+                    });
+
+                    // Draw pending location
+                    if (pendingLocation) {
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.arc(pendingLocation.x * zoom, pendingLocation.y * zoom, 10 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2 * zoom;
+                        ctx.stroke();
+                    }
+
+                    // Draw current training path
+                    if (mode === 'train' && currentPath.length > 0) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(currentPath[0].x * zoom, currentPath[0].y * zoom);
+                        currentPath.forEach(point => ctx.lineTo(point.x * zoom, point.y * zoom));
+                        ctx.stroke();
+                    }
+
+                    // Draw active navigation path
+                    if (activePath) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 4 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(activePath.path[0].x * zoom, activePath.path[0].y * zoom);
+                        activePath.path.forEach((point, idx) => {
+                            ctx.lineTo(point.x * zoom, point.y * zoom);
+                        });
+                        ctx.stroke();
+                    }
+                    
+                    ctx.restore();
+                };
+                img.src = floorPlan;
+            };
+
+            useEffect(() => {
+                drawCanvas();
+            }, [floorPlan, locations, currentPath, activePath, zoom, offset, pendingLocation]);
+
+            const handleCanvasClick = (e) => {
+                if (!canvasRef.current) return;
+                
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offset.x) / zoom;
+                const y = (e.clientY - rect.top - offset.y) / zoom;
+
+                if (addingLocation) {
+                    setPendingLocation({ x, y });
+                } else if (mode === 'train' && isAdmin) {
+                    setCurrentPath([...currentPath, { x, y }]);
+                }
+            };
+
+            const zoomIn = () => {
+                setZoom(prevZoom => Math.min(prevZoom * 1.2, 5));
+            };
+
+            const zoomOut = () => {
+                setZoom(prevZoom => Math.max(prevZoom / 1.2, 0.1));
+            };
+
+            const resetZoom = () => {
+                setZoom(1);
+                setOffset({ x: 0, y: 0 });
+            };
+
+            const handleMouseDown = (e) => {
+                if (e.button !== 0) return;
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - offset.x,
+                    y: e.clientY - offset.y
+                });
+                if (canvasRef.current) {
+                    canvasRef.current.style.cursor = 'grabbing';
+                }
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                
+                const newOffset = {
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                };
+                
+                setOffset(newOffset);
+            };
+
+            const handleMouseUp = () => {
+                setIsDragging(false);
+                if (canvasRef.current) {
+                    canvasRef.current.style.cursor = 'grab';
+                }
+            };
+
+            const handleModeChange = (newMode) => {
+                if ((newMode === 'view' || newMode === 'train') && !isAdmin) {
+                    alert('Admin access required for this mode');
+                    return;
+                }
+                setMode(newMode);
+            };
+
+            const startAddingLocation = () => {
+                if (!isAdmin) {
+                    alert('Admin access required to add locations');
+                    return;
+                }
+                setAddingLocation(true);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const confirmAddLocation = () => {
+                if (!newLocationName.trim()) {
+                    alert('Please enter a location name');
+                    return;
+                }
+                if (!pendingLocation) {
+                    alert('Please click on the floor plan to place the location');
+                    return;
+                }
+                setLocations([...locations, { 
+                    name: newLocationName.trim(), 
+                    x: pendingLocation.x, 
+                    y: pendingLocation.y 
+                }]);
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const cancelAddLocation = () => {
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const startNavigation = () => {
+                if (!navigateFrom || !navigateTo) {
+                    alert('Please select both "From" and "To" locations');
+                    return;
+                }
+
+                const path = paths.find(p => 
+                    p.from === navigateFrom && p.to === navigateTo
+                );
+
+                if (!path) {
+                    alert(`No path found between "${navigateFrom}" and "${navigateTo}"`);
+                    return;
+                }
+
+                setActivePath(path);
+                setIsNavigating(true);
+                setCurrentStep(0);
+                alert('Navigation started! This is a simplified version. Full navigation features would be implemented here.');
+            };
+
+            const stopNavigation = () => {
+                setIsNavigating(false);
+                setActivePath(null);
+                setCurrentStep(0);
+            };
+
+            const nextStep = () => {
+                if (!activePath || !isNavigating) return;
+                
+                const nextIdx = currentStep + 1;
+                if (nextIdx < activePath.instructions.length) {
+                    setCurrentStep(nextIdx);
+                } else {
+                    stopNavigation();
+                }
+            };
+
+            // Location dropdown component
+            const LocationDropdown = ({ value, onChange, placeholder, disabled }) => {
+                return React.createElement('select', {
+                    value: value,
+                    onChange: (e) => onChange(e.target.value),
+                    className: 'w-full mb-2',
+                    disabled: disabled
+                },
+                    React.createElement('option', { value: '' }, placeholder),
+                    locations.map((loc, idx) =>
+                        React.createElement('option', { key: idx, value: loc.name }, loc.name)
+                    )
+                );
+            };
+
+            // JSON File Management Component
+            const JSONFileManager = () => {
+                return React.createElement('div', { className: 'file-management-panel' },
+                    React.createElement('div', { 
+                        className: `file-status status-${jsonFileStatus.replace('-', '')}` 
+                    },
+                        jsonFileStatus === 'loaded' && '✓ JSON Data Loaded',
+                        jsonFileStatus === 'loading' && '⏳ Loading JSON...',
+                        jsonFileStatus === 'error' && '⚠️ Error Loading JSON',
+                        jsonFileStatus === 'loaded-from-local' && '⚠️ Using LocalStorage Data',
+                        jsonFileStatus === 'not-loaded' && '📁 No JSON Data Loaded',
+                        jsonFileStatus === 'imported' && '✓ Data Imported'
+                    ),
+                    
+                    React.createElement('div', { className: 'file-info' },
+                        React.createElement('div', { className: 'flex justify-between mb-1' },
+                            React.createElement('span', null, 'File URL:'),
+                            lastSaved && React.createElement('span', null, `Last: ${lastSaved}`)
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: jsonFileUrl,
+                            onChange: (e) => updateJSONFileUrl(e.target.value),
+                            className: 'file-url-input',
+                            placeholder: 'Enter JSON file URL (e.g., floor14_data.json)',
+                            onKeyPress: (e) => e.key === 'Enter' && loadJSONData()
+                        })
+                    ),
+                    
+                    React.createElement('div', { className: 'flex gap-2 mb-2' },
+                        React.createElement('button', {
+                            onClick: loadJSONData,
+                            className: 'btn-primary flex-1 text-sm',
+                            disabled: jsonFileStatus === 'loading'
+                        }, React.createElement(LoadIcon), ' Load'),
+                        React.createElement('button', {
+                            onClick: saveJSONData,
+                            className: 'btn-success flex-1 text-sm',
+                            disabled: isSaving
+                        }, isSaving ? 'Saving...' : [React.createElement(SaveIcon), ' Save'])
+                    ),
+                    
+                    React.createElement('div', { className: 'flex gap-2' },
+                        React.createElement('button', {
+                            onClick: () => document.getElementById('import-json-file')?.click(),
+                            className: 'btn-warning flex-1 text-sm'
+                        }, React.createElement(UploadIcon2), ' Import'),
+                        React.createElement('button', {
+                            onClick: exportDataAsJSON,
+                            className: 'btn-info flex-1 text-sm'
+                        }, React.createElement(DownloadIcon), ' Export')
+                    ),
+                    
+                    React.createElement('div', { className: 'flex items-center mt-2' },
+                        React.createElement('input', {
+                            type: 'checkbox',
+                            id: 'auto-save',
+                            checked: autoSave,
+                            onChange: (e) => setAutoSave(e.target.checked),
+                            className: 'mr-2'
+                        }),
+                        React.createElement('label', { 
+                            htmlFor: 'auto-save',
+                            className: 'text-xs'
+                        }, 'Auto-save every 10s')
+                    ),
+                    
+                    React.createElement('input', {
+                        id: 'import-json-file',
+                        type: 'file',
+                        accept: '.json',
+                        onChange: importDataFromFile,
+                        className: 'hidden'
+                    })
+                );
+            };
+
+            // =============================================
+            // MAIN RENDER FUNCTION
+            // =============================================
+            
+            return React.createElement('div', { className: 'app' },
+                React.createElement('div', { className: 'sidebar' },
+                    React.createElement('div', { className: 'flex justify-between items-center mb-4' },
+                        React.createElement('h1', null, 'Floor Plan Navigator'),
+                        React.createElement('div', { className: 'flex items-center' },
+                            React.createElement('span', { className: 'text-xs bg-gray-200 px-2 py-1 rounded' },
+                                deviceType.toUpperCase()
+                            ),
+                            isAdmin && React.createElement('span', { className: 'admin-indicator ml-2' }, 'ADMIN')
+                        )
+                    ),
+                    
+                    // JSON File Manager
+                    React.createElement(JSONFileManager, null),
+                    
+                    // Admin Login/Logout
+                    React.createElement('div', { className: 'section' },
+                        !isAdmin ? (
+                            React.createElement('div', null,
+                                React.createElement('button', {
+                                    onClick: () => setShowLogin(true),
+                                    className: 'btn-warning w-full'
+                                }, React.createElement(LoginIcon), ' Admin Login'),
+                                showLogin && React.createElement('div', { className: 'login-panel' },
+                                    React.createElement('h3', null, 'Admin Login'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        value: username,
+                                        onChange: (e) => setUsername(e.target.value),
+                                        placeholder: 'Username',
+                                        className: 'w-full mb-2'
+                                    }),
+                                    React.createElement('input', {
+                                        type: 'password',
+                                        value: password,
+                                        onChange: (e) => setPassword(e.target.value),
+                                        placeholder: 'Password',
+                                        className: 'w-full mb-2',
+                                        onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+                                    }),
+                                    React.createElement('div', { className: 'flex gap-2' },
+                                        React.createElement('button', {
+                                            onClick: handleLogin,
+                                            className: 'btn-success flex-1'
+                                        }, 'Login'),
+                                        React.createElement('button', {
+                                            onClick: () => setShowLogin(false),
+                                            className: 'btn-secondary flex-1'
+                                        }, 'Cancel')
+                                    )
+                                )
+                            )
+                        ) : (
+                            React.createElement('button', {
+                                onClick: handleLogout,
+                                className: 'btn-secondary w-full'
+                            }, React.createElement(LogoutIcon), ' Logout Admin')
+                        )
+                    ),
+
+                    // Floor Plan Upload
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('button', {
+                            onClick: () => fileInputRef.current?.click(),
+                            className: 'btn-primary w-full'
+                        }, React.createElement(UploadIcon), ' Upload Floor Plan'),
+                        React.createElement('input', {
+                            ref: fileInputRef,
+                            type: 'file',
+                            accept: 'image/*',
+                            onChange: handleFileUpload,
+                            className: 'hidden'
+                        })
+                    ),
+
+                    // Mode Selection
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('label', { className: 'text-sm' }, 'Mode:'),
+                        React.createElement('div', { className: 'mode-buttons' },
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('view'),
+                                className: `mode-btn ${mode === 'view' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'View'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('train'),
+                                className: `mode-btn train ${mode === 'train' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'Train'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('navigate'),
+                                className: `mode-btn navigate ${mode === 'navigate' ? 'active' : ''}`
+                            }, 'Navigate')
+                        )
+                    ),
+
+                    // Navigation Panel
+                    mode === 'navigate' && React.createElement('div', { className: 'navigation-panel' },
+                        React.createElement('h3', null, 'Navigate'),
+                        React.createElement(LocationDropdown, {
+                            value: navigateFrom,
+                            onChange: setNavigateFrom,
+                            placeholder: 'From...',
+                            disabled: isNavigating
+                        }),
+                        React.createElement(LocationDropdown, {
+                            value: navigateTo,
+                            onChange: setNavigateTo,
+                            placeholder: 'To...',
+                            disabled: isNavigating
+                        }),
+                        !isNavigating ? React.createElement('button', {
+                            onClick: startNavigation,
+                            className: 'btn-danger w-full'
+                        }, React.createElement(NavigationIcon), ' Start Navigation') :
+                        React.createElement('div', null,
+                            React.createElement('div', { className: 'instruction-text' },
+                                `Step ${currentStep + 1}/${activePath.instructions.length}`,
+                                React.createElement('br'),
+                                activePath.instructions[currentStep]
+                            ),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: nextStep,
+                                    className: 'btn-primary flex-1 text-sm'
+                                }, React.createElement(PlayIcon), ' Next'),
+                                React.createElement('button', {
+                                    onClick: stopNavigation,
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Stop')
+                            )
+                        )
+                    ),
+
+                    // Locations Management
+                    isAdmin && React.createElement('div', { className: 'section' },
+                        React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                            React.createElement('h2', null, 'Manage Locations'),
+                            !addingLocation && React.createElement('button', {
+                                onClick: startAddingLocation,
+                                className: 'btn-primary text-sm'
+                            }, '+ Add Location')
+                        ),
+                        
+                        addingLocation && React.createElement('div', { className: 'add-location-panel' },
+                            React.createElement('h3', { className: 'text-sm' }, 'Add New Location'),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: newLocationName,
+                                onChange: (e) => setNewLocationName(e.target.value),
+                                placeholder: 'Enter location name...',
+                                className: 'w-full mb-2',
+                                onKeyPress: (e) => e.key === 'Enter' && confirmAddLocation()
+                            }),
+                            React.createElement('p', { className: 'text-xs text-gray-600 mb-2' },
+                                pendingLocation ? '✓ Location marked on map' : 'Click on the map to place marker'
+                            ),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: confirmAddLocation,
+                                    className: 'btn-success flex-1 text-sm'
+                                }, 'Save'),
+                                React.createElement('button', {
+                                    onClick: cancelAddLocation,
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Cancel')
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'scroll-container' },
+                            locations.length === 0 
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No locations added yet')
+                                : locations.map((loc, idx) =>
+                                    React.createElement('div', { key: idx, className: 'path-item' },
+                                        React.createElement('span', null, loc.name),
+                                        React.createElement('button', {
+                                            onClick: () => setLocations(locations.filter((_, i) => i !== idx)),
+                                            className: 'text-red-500'
+                                        }, React.createElement(TrashIcon))
+                                    )
+                                )
+                        )
+                    ),
+
+                    // Saved Paths
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('h2', null, `Saved Paths (${paths.length})`),
+                        React.createElement('div', { className: 'scroll-container' },
+                            paths.length === 0
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No paths saved yet')
+                                : paths.map((path, idx) =>
+                                    React.createElement('div', { 
+                                        key: idx, 
+                                        className: `path-item ${selectedPathIndex === idx ? 'active' : ''}`,
+                                        onClick: () => {
+                                            setNavigateFrom(path.from);
+                                            setNavigateTo(path.to);
+                                            setSelectedPathIndex(idx);
+                                        }
+                                    },
+                                        React.createElement('div', null,
+                                            `${path.from} → ${path.to}`,
+                                            React.createElement('span', { className: 'text-xs text-gray-600' },
+                                                ` (${path.instructions.length} steps)`
+                                            )
+                                        )
+                                    )
+                                )
+                        )
+                    ),
+
+                    // Save Button
+                    isAdmin && React.createElement('button', {
+                        onClick: saveData,
+                        className: 'btn-primary w-full'
+                    }, React.createElement(SaveIcon), ' Save All Data')
+                ),
+
+                // Main Content Area
+                React.createElement('div', { className: 'main-content' },
+                    floorPlan && React.createElement('div', { className: 'zoom-controls' },
+                        React.createElement('button', {
+                            onClick: zoomOut,
+                            className: 'zoom-btn',
+                            disabled: zoom <= 0.1
+                        }, React.createElement(ZoomOutIcon)),
+                        React.createElement('div', { className: 'zoom-level' }, `${Math.round(zoom * 100)}%`),
+                        React.createElement('button', {
+                            onClick: zoomIn,
+                            className: 'zoom-btn',
+                            disabled: zoom >= 5
+                        }, React.createElement(ZoomInIcon)),
+                        React.createElement('button', {
+                            onClick: resetZoom,
+                            className: 'zoom-btn'
+                        }, React.createElement(ResetZoomIcon))
+                    ),
+                    
+                    floorPlan 
+                        ? React.createElement('div', { 
+                                className: 'canvas-container',
+                                onMouseDown: handleMouseDown,
+                                onMouseMove: handleMouseMove,
+                                onMouseUp: handleMouseUp,
+                                onMouseLeave: handleMouseUp
+                            },
+                            addingLocation && React.createElement('div', { className: 'alert-info' },
+                                'Adding Location Mode: Click anywhere on the floor plan to place a location marker'
+                            ),
+                            mode === 'train' && isAdmin && React.createElement('div', { className: 'alert-info' },
+                                'Train Mode: Click on the floor plan to draw a path'
+                            ),
+                            React.createElement('canvas', {
+                                ref: canvasRef,
+                                onClick: handleCanvasClick,
+                                className: 'cursor-grab'
+                            })
+                        ) 
+                        : React.createElement('div', { className: 'upload-area' },
+                            React.createElement('div', { style: { fontSize: '3rem', marginBottom: '1rem' } }, '📤'),
+                            React.createElement('p', { className: 'text-lg font-semibold mb-2' }, 'Upload a Floor Plan'),
+                            React.createElement('p', { className: 'text-gray-600 mb-4' }, 'Supported formats: JPG, PNG, GIF, BMP'),
+                            React.createElement('button', {
+                                onClick: () => fileInputRef.current?.click(),
+                                className: 'btn-primary px-8 py-3 text-lg'
+                            }, 'Choose File')
+                        )
+                )
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(React.createElement(FloorPlanNavigator), document.getElementById('root'));
+    </script>
+</body>
+</html>

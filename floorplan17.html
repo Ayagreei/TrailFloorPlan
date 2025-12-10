@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Plan Navigator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; background: #f3f4f6; }
+        .app { display: flex; height: 100vh; width: 100vw; }
+        .sidebar { width: 320px; background: white; box-shadow: 2px 0 10px rgba(0,0,0,0.1); padding: 20px; overflow-y: auto; }
+        .main-content { flex: 1; padding: 20px; display: flex; flex-direction: column; }
+        .canvas-container { flex: 1; background: white; border-radius: 8px; border: 2px solid #d1d5db; overflow: auto; position: relative; }
+        canvas { display: block; }
+        .zoom-controls { position: absolute; top: 20px; right: 20px; background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; gap: 10px; }
+        .zoom-btn { width: 40px; height: 40px; border: 1px solid #d1d5db; background: white; border-radius: 6px; cursor: pointer; font-size: 18px; }
+        
+        /* Basic button styles */
+        button { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        
+        .section { margin-bottom: 20px; }
+        .panel { background: #f9fafb; border-radius: 8px; padding: 15px; margin-bottom: 15px; border: 1px solid #e5e7eb; }
+        .training-panel { background: #ecfdf5; border-color: #a7f3d0; }
+        .navigation-panel { background: #fef2f2; border-color: #fecaca; }
+        .file-panel { background: #f5f3ff; border-color: #8b5cf6; }
+        
+        select, input { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 10px; }
+        
+        .path-list { max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 5px; }
+        .path-item { padding: 8px; background: white; border-radius: 4px; margin-bottom: 5px; cursor: pointer; }
+        .path-item:hover { background: #f3f4f6; }
+        .path-item.active { background: #dbeafe; border: 1px solid #3b82f6; }
+        
+        .upload-area { text-align: center; padding: 60px 20px; color: #6b7280; }
+        
+        .alert { padding: 12px; border-radius: 6px; margin-bottom: 10px; }
+        .alert-info { background: #dbeafe; border: 2px solid #3b82f6; color: #1e40af; }
+        .alert-warning { background: #fef3c7; border: 2px solid #f59e0b; color: #92400e; }
+        
+        .instructions-container { max-height: 200px; overflow-y: auto; }
+        .instruction-item { padding: 8px; background: white; border-radius: 4px; margin-bottom: 5px; border: 1px solid #e5e7eb; }
+        
+        .mode-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
+        .mode-btn { flex: 1; padding: 10px; background: #e5e7eb; border: none; border-radius: 6px; cursor: pointer; }
+        .mode-btn.active { background: #3b82f6; color: white; }
+        .mode-btn.train.active { background: #10b981; }
+        .mode-btn.navigate.active { background: #ef4444; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const FloorPlanNavigator = () => {
+            // Main state
+            const [floorPlan, setFloorPlan] = useState(null);
+            const [mode, setMode] = useState('navigate');
+            const [locations, setLocations] = useState([]);
+            const [paths, setPaths] = useState([]);
+            const [currentPath, setCurrentPath] = useState([]);
+            const [trainingFrom, setTrainingFrom] = useState('');
+            const [trainingTo, setTrainingTo] = useState('');
+            const [navigateFrom, setNavigateFrom] = useState('');
+            const [navigateTo, setNavigateTo] = useState('');
+            const [activePath, setActivePath] = useState(null);
+            const [isNavigating, setIsNavigating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [addingLocation, setAddingLocation] = useState(false);
+            const [newLocationName, setNewLocationName] = useState('');
+            const [pendingLocation, setPendingLocation] = useState(null);
+            
+            // JSON file state
+            const [jsonFileUrl, setJsonFileUrl] = useState('floor14_data.json');
+            const [jsonFileStatus, setJsonFileStatus] = useState('not-loaded');
+            
+            // Zoom state
+            const [zoom, setZoom] = useState(1);
+            const [offset, setOffset] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            
+            // Instructions
+            const [instructions, setInstructions] = useState([]);
+            const [newInstructionText, setNewInstructionText] = useState('');
+            
+            // Admin state
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Admin credentials
+            const ADMIN_CREDENTIALS = { username: 'admin', password: 'admin123' };
+
+            // Load JSON data
+            const loadJSONData = async () => {
+                try {
+                    setJsonFileStatus('loading');
+                    const response = await fetch(jsonFileUrl);
+                    if (!response.ok) throw new Error('Failed to load JSON');
+                    
+                    const data = await response.json();
+                    if (data.locations) setLocations(data.locations);
+                    if (data.paths) setPaths(data.paths);
+                    if (data.floorPlan) setFloorPlan(data.floorPlan);
+                    
+                    setJsonFileStatus('loaded');
+                    alert('Data loaded successfully!');
+                } catch (error) {
+                    console.error('Error loading JSON:', error);
+                    setJsonFileStatus('error');
+                    alert('Failed to load JSON file. Check console for details.');
+                }
+            };
+
+            // Save JSON data
+            const saveJSONData = () => {
+                const dataToSave = {
+                    locations: locations,
+                    paths: paths,
+                    floorPlan: floorPlan,
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                const dataStr = JSON.stringify(dataToSave, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = jsonFileUrl.split('/').pop() || 'floor14_data.json';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                alert('Data saved as ' + link.download);
+            };
+
+            // Draw canvas
+            const drawCanvas = () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !floorPlan) return;
+
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const displayWidth = img.width * zoom;
+                    const displayHeight = img.height * zoom;
+                    
+                    canvas.width = displayWidth;
+                    canvas.height = displayHeight;
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(offset.x, offset.y);
+                    
+                    // Draw image
+                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+                    
+                    // Draw locations
+                    locations.forEach(loc => {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.beginPath();
+                        ctx.arc(loc.x * zoom, loc.y * zoom, 8 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.fillStyle = '#000';
+                        ctx.font = `${14 * zoom}px Arial`;
+                        ctx.fillText(loc.name, loc.x * zoom + 12 * zoom, loc.y * zoom + 5 * zoom);
+                    });
+                    
+                    // Draw current path (training mode)
+                    if (mode === 'train' && currentPath.length > 0) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(currentPath[0].x * zoom, currentPath[0].y * zoom);
+                        currentPath.forEach(point => {
+                            ctx.lineTo(point.x * zoom, point.y * zoom);
+                        });
+                        ctx.stroke();
+                        
+                        // Draw path points
+                        currentPath.forEach((point, index) => {
+                            ctx.fillStyle = index === 0 ? '#10b981' : (index === currentPath.length - 1 ? '#ef4444' : '#f59e0b');
+                            ctx.beginPath();
+                            ctx.arc(point.x * zoom, point.y * zoom, 6 * zoom, 0, 2 * Math.PI);
+                            ctx.fill();
+                        });
+                    }
+                    
+                    // Draw active navigation path
+                    if (activePath && isNavigating) {
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 4 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(activePath.path[0].x * zoom, activePath.path[0].y * zoom);
+                        activePath.path.forEach(point => {
+                            ctx.lineTo(point.x * zoom, point.y * zoom);
+                        });
+                        ctx.stroke();
+                        
+                        // Draw current position
+                        if (currentStep < activePath.path.length) {
+                            const pos = activePath.path[currentStep];
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(pos.x * zoom, pos.y * zoom, 10 * zoom, 0, 2 * Math.PI);
+                            ctx.fill();
+                        }
+                    }
+                    
+                    ctx.restore();
+                };
+                img.src = floorPlan;
+            };
+
+            // Handle canvas click
+            const handleCanvasClick = (e) => {
+                if (!canvasRef.current) return;
+                
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offset.x) / zoom;
+                const y = (e.clientY - rect.top - offset.y) / zoom;
+                
+                if (addingLocation) {
+                    setPendingLocation({ x, y });
+                } else if (mode === 'train' && isAdmin) {
+                    setCurrentPath([...currentPath, { x, y }]);
+                }
+            };
+
+            // Handle file upload
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setFloorPlan(event.target.result);
+                        setZoom(1);
+                        setOffset({ x: 0, y: 0 });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            // Zoom functions
+            const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
+            const zoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.1));
+            const resetZoom = () => { setZoom(1); setOffset({ x: 0, y: 0 }); };
+
+            // Pan functions
+            const handleMouseDown = (e) => {
+                if (e.button !== 0) return;
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - offset.x,
+                    y: e.clientY - offset.y
+                });
+                canvasRef.current.style.cursor = 'grabbing';
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                const newOffset = {
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                };
+                setOffset(newOffset);
+            };
+
+            const handleMouseUp = () => {
+                setIsDragging(false);
+                if (canvasRef.current) {
+                    canvasRef.current.style.cursor = 'grab';
+                }
+            };
+
+            // Train mode functions
+            const clearCurrentPath = () => {
+                setCurrentPath([]);
+                setInstructions([]);
+                setTrainingFrom('');
+                setTrainingTo('');
+            };
+
+            const calculateTotalDistance = (pathPoints) => {
+                if (!pathPoints || pathPoints.length < 2) return 0;
+                let total = 0;
+                for (let i = 1; i < pathPoints.length; i++) {
+                    const dx = pathPoints[i].x - pathPoints[i-1].x;
+                    const dy = pathPoints[i].y - pathPoints[i-1].y;
+                    total += Math.sqrt(dx * dx + dy * dy);
+                }
+                return Math.round(total);
+            };
+
+            const generateInstructions = () => {
+                if (currentPath.length < 2 || !trainingFrom || !trainingTo) {
+                    return ['Please complete the path first'];
+                }
+                
+                const autoInstructions = [`Start from ${trainingFrom}`];
+                for (let i = 1; i < currentPath.length - 1; i++) {
+                    autoInstructions.push(`Continue to point ${i}`);
+                }
+                autoInstructions.push(`Arrive at ${trainingTo}`);
+                return autoInstructions;
+            };
+
+            const autoGenerateInstructions = () => {
+                if (currentPath.length < 2) {
+                    alert('Please draw a path first');
+                    return;
+                }
+                setInstructions(generateInstructions());
+            };
+
+            const saveTrainingPath = () => {
+                if (!trainingFrom || !trainingTo || currentPath.length < 2) {
+                    alert('Please select start/end locations and draw a path (at least 2 points)');
+                    return;
+                }
+
+                const finalInstructions = instructions.length > 0 ? 
+                    instructions : 
+                    generateInstructions();
+
+                const newPath = {
+                    from: trainingFrom,
+                    to: trainingTo,
+                    path: [...currentPath],
+                    instructions: finalInstructions
+                };
+
+                setPaths([...paths, newPath]);
+                clearCurrentPath();
+                alert('Path saved successfully!');
+            };
+
+            // Navigation functions
+            const startNavigation = () => {
+                if (!navigateFrom || !navigateTo) {
+                    alert('Please select both "From" and "To" locations');
+                    return;
+                }
+
+                const path = paths.find(p => 
+                    p.from === navigateFrom && p.to === navigateTo
+                );
+
+                if (!path) {
+                    alert(`No path found between "${navigateFrom}" and "${navigateTo}"`);
+                    return;
+                }
+
+                setActivePath(path);
+                setIsNavigating(true);
+                setCurrentStep(0);
+            };
+
+            const nextStep = () => {
+                if (!activePath || !isNavigating) return;
+                
+                const nextIdx = currentStep + 1;
+                if (nextIdx < activePath.instructions.length) {
+                    setCurrentStep(nextIdx);
+                } else {
+                    alert('You have arrived at your destination!');
+                    setIsNavigating(false);
+                    setActivePath(null);
+                    setCurrentStep(0);
+                }
+            };
+
+            const stopNavigation = () => {
+                setIsNavigating(false);
+                setActivePath(null);
+                setCurrentStep(0);
+            };
+
+            // Admin functions
+            const handleLogin = () => {
+                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPassword('');
+                    alert('Admin login successful!');
+                } else {
+                    alert('Invalid credentials');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsAdmin(false);
+                setMode('navigate');
+                alert('Logged out successfully');
+            };
+
+            // Location management
+            const startAddingLocation = () => {
+                if (!isAdmin) {
+                    alert('Admin access required to add locations');
+                    return;
+                }
+                setAddingLocation(true);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const confirmAddLocation = () => {
+                if (!newLocationName.trim()) {
+                    alert('Please enter a location name');
+                    return;
+                }
+                if (!pendingLocation) {
+                    alert('Please click on the floor plan to place the location');
+                    return;
+                }
+                setLocations([...locations, { 
+                    name: newLocationName.trim(), 
+                    x: pendingLocation.x, 
+                    y: pendingLocation.y 
+                }]);
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const cancelAddLocation = () => {
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            // Instruction management
+            const addNewInstruction = () => {
+                if (newInstructionText.trim()) {
+                    setInstructions([...instructions, newInstructionText.trim()]);
+                    setNewInstructionText('');
+                }
+            };
+
+            const deleteInstruction = (index) => {
+                const newInstructions = instructions.filter((_, i) => i !== index);
+                setInstructions(newInstructions);
+            };
+
+            // Mode change
+            const handleModeChange = (newMode) => {
+                if ((newMode === 'view' || newMode === 'train') && !isAdmin) {
+                    alert('Admin access required for this mode');
+                    return;
+                }
+                setMode(newMode);
+            };
+
+            // Location dropdown component
+            const LocationDropdown = ({ value, onChange, placeholder, disabled }) => {
+                return React.createElement('select', {
+                    value: value,
+                    onChange: (e) => onChange(e.target.value),
+                    style: { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px' },
+                    disabled: disabled
+                },
+                    React.createElement('option', { value: '' }, placeholder),
+                    locations.map((loc, idx) =>
+                        React.createElement('option', { key: idx, value: loc.name }, loc.name)
+                    )
+                );
+            };
+
+            // Load data on mount
+            useEffect(() => {
+                loadJSONData();
+            }, []);
+
+            // Redraw canvas when dependencies change
+            useEffect(() => {
+                drawCanvas();
+            }, [floorPlan, locations, currentPath, activePath, isNavigating, currentStep, zoom, offset, pendingLocation]);
+
+            return React.createElement('div', { className: 'app' },
+                // Sidebar
+                React.createElement('div', { className: 'sidebar' },
+                    React.createElement('h1', { style: { marginBottom: '20px' } }, 'Floor Plan Navigator'),
+                    
+                    // File Management
+                    React.createElement('div', { className: 'file-panel' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, 'Data Management'),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: jsonFileUrl,
+                            onChange: (e) => setJsonFileUrl(e.target.value),
+                            placeholder: 'JSON file URL',
+                            style: { marginBottom: '10px' }
+                        }),
+                        React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+                            React.createElement('button', {
+                                onClick: loadJSONData,
+                                className: 'btn-primary'
+                            }, 'Load Data'),
+                            React.createElement('button', {
+                                onClick: saveJSONData,
+                                className: 'btn-success'
+                            }, 'Save Data')
+                        )
+                    ),
+                    
+                    // Admin Login/Logout
+                    React.createElement('div', { className: 'section' },
+                        !isAdmin ? (
+                            React.createElement('div', null,
+                                React.createElement('button', {
+                                    onClick: () => setShowLogin(true),
+                                    className: 'btn-warning',
+                                    style: { width: '100%' }
+                                }, 'Admin Login'),
+                                showLogin && React.createElement('div', { className: 'panel', style: { marginTop: '10px' } },
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        value: username,
+                                        onChange: (e) => setUsername(e.target.value),
+                                        placeholder: 'Username',
+                                        style: { marginBottom: '10px' }
+                                    }),
+                                    React.createElement('input', {
+                                        type: 'password',
+                                        value: password,
+                                        onChange: (e) => setPassword(e.target.value),
+                                        placeholder: 'Password',
+                                        style: { marginBottom: '10px' }
+                                    }),
+                                    React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+                                        React.createElement('button', {
+                                            onClick: handleLogin,
+                                            className: 'btn-success'
+                                        }, 'Login'),
+                                        React.createElement('button', {
+                                            onClick: () => setShowLogin(false),
+                                            className: 'btn-secondary'
+                                        }, 'Cancel')
+                                    )
+                                )
+                            )
+                        ) : (
+                            React.createElement('button', {
+                                onClick: handleLogout,
+                                className: 'btn-secondary',
+                                style: { width: '100%' }
+                            }, 'Logout Admin')
+                        )
+                    ),
+                    
+                    // Upload Floor Plan
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('button', {
+                            onClick: () => fileInputRef.current?.click(),
+                            className: 'btn-primary',
+                            style: { width: '100%' }
+                        }, 'Upload Floor Plan'),
+                        React.createElement('input', {
+                            ref: fileInputRef,
+                            type: 'file',
+                            accept: 'image/*',
+                            onChange: handleFileUpload,
+                            style: { display: 'none' }
+                        })
+                    ),
+                    
+                    // Mode Selection
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, 'Mode'),
+                        React.createElement('div', { className: 'mode-buttons' },
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('view'),
+                                className: `mode-btn ${mode === 'view' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'View'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('train'),
+                                className: `mode-btn train ${mode === 'train' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'Train'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('navigate'),
+                                className: `mode-btn navigate ${mode === 'navigate' ? 'active' : ''}`
+                            }, 'Navigate')
+                        )
+                    ),
+                    
+                    // Train Mode Panel
+                    mode === 'train' && isAdmin && React.createElement('div', { className: 'training-panel' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, 'Train New Path'),
+                        React.createElement(LocationDropdown, {
+                            value: trainingFrom,
+                            onChange: setTrainingFrom,
+                            placeholder: 'From...'
+                        }),
+                        React.createElement(LocationDropdown, {
+                            value: trainingTo,
+                            onChange: setTrainingTo,
+                            placeholder: 'To...'
+                        }),
+                        React.createElement('p', { style: { fontSize: '12px', color: '#6b7280', marginBottom: '10px' } }, 
+                            'Click on the floor plan to draw path points'
+                        ),
+                        React.createElement('div', { style: { display: 'flex', gap: '10px', marginBottom: '10px' } },
+                            React.createElement('button', {
+                                onClick: saveTrainingPath,
+                                className: 'btn-success',
+                                disabled: currentPath.length < 2 || !trainingFrom || !trainingTo
+                            }, 'Save Path'),
+                            React.createElement('button', {
+                                onClick: clearCurrentPath,
+                                className: 'btn-secondary'
+                            }, 'Clear')
+                        ),
+                        currentPath.length > 0 && React.createElement('div', { style: { fontSize: '12px', color: '#6b7280' } },
+                            `Path: ${currentPath.length} points, ${calculateTotalDistance(currentPath)}px`
+                        ),
+                        
+                        // Instructions
+                        React.createElement('div', { style: { marginTop: '15px' } },
+                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+                                React.createElement('h4', null, 'Instructions'),
+                                React.createElement('button', {
+                                    onClick: autoGenerateInstructions,
+                                    className: 'btn-warning',
+                                    style: { fontSize: '12px', padding: '5px 10px' }
+                                }, 'Auto-generate')
+                            ),
+                            React.createElement('div', { className: 'instructions-container' },
+                                instructions.map((instruction, index) =>
+                                    React.createElement('div', { 
+                                        key: index, 
+                                        className: 'instruction-item',
+                                        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+                                    },
+                                        React.createElement('span', null, `${index + 1}. ${instruction}`),
+                                        React.createElement('button', {
+                                            onClick: () => deleteInstruction(index),
+                                            style: { background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }
+                                        }, 'Delete')
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { style: { display: 'flex', gap: '10px', marginTop: '10px' } },
+                                React.createElement('input', {
+                                    type: 'text',
+                                    value: newInstructionText,
+                                    onChange: (e) => setNewInstructionText(e.target.value),
+                                    placeholder: 'Add instruction...',
+                                    style: { flex: 1 }
+                                }),
+                                React.createElement('button', {
+                                    onClick: addNewInstruction,
+                                    className: 'btn-primary',
+                                    style: { padding: '8px 12px' }
+                                }, 'Add')
+                            )
+                        )
+                    ),
+                    
+                    // Navigation Panel
+                    mode === 'navigate' && React.createElement('div', { className: 'navigation-panel' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, 'Navigate'),
+                        React.createElement(LocationDropdown, {
+                            value: navigateFrom,
+                            onChange: setNavigateFrom,
+                            placeholder: 'From...',
+                            disabled: isNavigating
+                        }),
+                        React.createElement(LocationDropdown, {
+                            value: navigateTo,
+                            onChange: setNavigateTo,
+                            placeholder: 'To...',
+                            disabled: isNavigating
+                        }),
+                        !isNavigating ? 
+                            React.createElement('button', {
+                                onClick: startNavigation,
+                                className: 'btn-danger',
+                                style: { width: '100%' }
+                            }, 'Start Navigation') :
+                            React.createElement('div', null,
+                                React.createElement('div', { 
+                                    className: 'alert alert-info',
+                                    style: { marginBottom: '10px' }
+                                },
+                                    `Step ${currentStep + 1}/${activePath.instructions.length}`,
+                                    React.createElement('br'),
+                                    activePath.instructions[currentStep]
+                                ),
+                                React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+                                    React.createElement('button', {
+                                        onClick: nextStep,
+                                        className: 'btn-primary'
+                                    }, 'Next Step'),
+                                    React.createElement('button', {
+                                        onClick: stopNavigation,
+                                        className: 'btn-secondary'
+                                    }, 'Stop')
+                                )
+                            )
+                    ),
+                    
+                    // Locations Management
+                    isAdmin && React.createElement('div', { className: 'section' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, 'Manage Locations'),
+                        !addingLocation && React.createElement('button', {
+                            onClick: startAddingLocation,
+                            className: 'btn-primary',
+                            style: { marginBottom: '10px' }
+                        }, '+ Add Location'),
+                        addingLocation && React.createElement('div', { className: 'panel' },
+                            React.createElement('input', {
+                                type: 'text',
+                                value: newLocationName,
+                                onChange: (e) => setNewLocationName(e.target.value),
+                                placeholder: 'Location name...',
+                                style: { marginBottom: '10px' }
+                            }),
+                            React.createElement('p', { style: { fontSize: '12px', color: '#6b7280', marginBottom: '10px' } },
+                                pendingLocation ? 'Location marked on map' : 'Click on map to place'
+                            ),
+                            React.createElement('div', { style: { display: 'flex', gap: '10px' } },
+                                React.createElement('button', {
+                                    onClick: confirmAddLocation,
+                                    className: 'btn-success'
+                                }, 'Save'),
+                                React.createElement('button', {
+                                    onClick: cancelAddLocation,
+                                    className: 'btn-secondary'
+                                }, 'Cancel')
+                            )
+                        ),
+                        React.createElement('div', { className: 'path-list' },
+                            locations.length === 0 ?
+                                React.createElement('p', { style: { color: '#6b7280', textAlign: 'center', padding: '10px' } }, 'No locations added') :
+                                locations.map((loc, idx) =>
+                                    React.createElement('div', { 
+                                        key: idx, 
+                                        className: 'path-item',
+                                        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+                                    },
+                                        React.createElement('span', null, loc.name),
+                                        React.createElement('button', {
+                                            onClick: () => setLocations(locations.filter((_, i) => i !== idx)),
+                                            style: { background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }
+                                        }, 'Delete')
+                                    )
+                                )
+                        )
+                    ),
+                    
+                    // Saved Paths
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('h3', { style: { marginBottom: '10px' } }, `Saved Paths (${paths.length})`),
+                        React.createElement('div', { className: 'path-list' },
+                            paths.length === 0 ?
+                                React.createElement('p', { style: { color: '#6b7280', textAlign: 'center', padding: '10px' } }, 'No paths saved') :
+                                paths.map((path, idx) =>
+                                    React.createElement('div', { 
+                                        key: idx, 
+                                        className: 'path-item',
+                                        onClick: () => {
+                                            setNavigateFrom(path.from);
+                                            setNavigateTo(path.to);
+                                        }
+                                    },
+                                        `${path.from} → ${path.to}`,
+                                        React.createElement('span', { style: { fontSize: '12px', color: '#6b7280' } },
+                                            ` (${path.instructions.length} steps)`
+                                        )
+                                    )
+                                )
+                        )
+                    )
+                ),
+                
+                // Main Content
+                React.createElement('div', { className: 'main-content' },
+                    // Zoom Controls
+                    floorPlan && React.createElement('div', { className: 'zoom-controls' },
+                        React.createElement('button', {
+                            onClick: zoomOut,
+                            className: 'zoom-btn',
+                            disabled: zoom <= 0.1
+                        }, '-'),
+                        React.createElement('div', { style: { minWidth: '60px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            `${Math.round(zoom * 100)}%`
+                        ),
+                        React.createElement('button', {
+                            onClick: zoomIn,
+                            className: 'zoom-btn',
+                            disabled: zoom >= 5
+                        }, '+'),
+                        React.createElement('button', {
+                            onClick: resetZoom,
+                            className: 'zoom-btn'
+                        }, '⟳')
+                    ),
+                    
+                    // Canvas Area
+                    floorPlan ? 
+                        React.createElement('div', {
+                            className: 'canvas-container',
+                            onMouseDown: handleMouseDown,
+                            onMouseMove: handleMouseMove,
+                            onMouseUp: handleMouseUp,
+                            onMouseLeave: handleMouseUp
+                        },
+                            addingLocation && React.createElement('div', { className: 'alert alert-info' },
+                                'Adding Location Mode: Click on the map to place a marker'
+                            ),
+                            mode === 'train' && isAdmin && React.createElement('div', { className: 'alert alert-info' },
+                                'Train Mode: Click on the map to draw path points'
+                            ),
+                            React.createElement('canvas', {
+                                ref: canvasRef,
+                                onClick: handleCanvasClick,
+                                style: { cursor: 'grab' }
+                            })
+                        ) :
+                        React.createElement('div', { className: 'upload-area' },
+                            React.createElement('div', { style: { fontSize: '48px', marginBottom: '20px' } }, '📤'),
+                            React.createElement('h2', { style: { marginBottom: '10px' } }, 'Upload a Floor Plan'),
+                            React.createElement('p', { style: { marginBottom: '20px', color: '#6b7280' } }, 'Supported formats: JPG, PNG, GIF, BMP'),
+                            React.createElement('button', {
+                                onClick: () => fileInputRef.current?.click(),
+                                className: 'btn-primary',
+                                style: { padding: '15px 30px', fontSize: '16px' }
+                            }, 'Choose File')
+                        )
+                )
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(React.createElement(FloorPlanNavigator), document.getElementById('root'));
+    </script>
+</body>
+</html>
