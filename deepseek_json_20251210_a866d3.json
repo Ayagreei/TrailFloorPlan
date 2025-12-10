@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "exportDate": "2024-01-15T10:30:00.000Z",
+  "appName": "School Navigation System",
+  "data": {
+    "floorPlan": "data:image/png;base64,...",
+    "locations": [
+      {"name": "Classroom 101", "x": 100, "y": 200}
+    ],
+    "paths": [
+      {"id": 123456, "name": "Main Hall to Cafeteria", ...}
+    ],
+    "lastSave": "2024-01-15T10:30:00.000Z"
+  }
+}

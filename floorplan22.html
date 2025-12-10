@@ -1,0 +1,2980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Navigation System - Floor Plan Navigator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .app {
+            width: 100vw;
+            height: 100vh;
+            background-color: #f3f4f6;
+            display: flex;
+        }
+        .sidebar {
+            width: 320px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .main-content {
+            flex: 1;
+            padding: 1rem;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .canvas-container {
+            background: white;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            overflow: auto;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        canvas {
+            display: block;
+            max-width: none;
+            max-height: none;
+            transition: transform 0.2s ease;
+        }
+        
+        /* SCHOOL NAVIGATION HEADER STYLES */
+        .school-header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-left: 6px solid #10b981;
+        }
+        
+        .school-title {
+            font-size: 1.75rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .school-subtitle {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .school-icon {
+            font-size: 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .school-badge {
+            background: #10b981;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: auto;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0.375rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:hover {
+            background: #f3f4f6;
+        }
+        .zoom-level {
+            min-width: 60px;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .btn-warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+        .btn-info {
+            background-color: #06b6d4;
+            color: white;
+        }
+        .btn-info:hover {
+            background-color: #0891b2;
+        }
+        .mode-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .mode-btn.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .mode-btn.train.active {
+            background-color: #10b981;
+        }
+        .mode-btn.navigate.active {
+            background-color: #ef4444;
+        }
+        .mode-btn.disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .section {
+            margin-bottom: 1.5rem;
+        }
+        .path-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            background-color: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.25rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .path-item:hover {
+            background-color: #e5e7eb;
+        }
+        .path-item.active {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+        }
+        .scroll-container {
+            max-height: 160px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.25rem;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .training-panel, .navigation-panel {
+            background-color: #ecfdf5;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #a7f3d0;
+            margin-bottom: 1rem;
+        }
+        .navigation-panel {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+        }
+        .add-location-panel {
+            background-color: #eff6ff;
+            border: 2px solid #93c5fd;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .login-panel {
+            background-color: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .admin-indicator {
+            background-color: #10b981;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        .instruction-text {
+            font-size: 0.875rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-success {
+            background-color: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .upload-area {
+            text-align: center;
+            color: #9ca3af;
+            padding: 3rem;
+        }
+        
+        /* DATA MANAGEMENT STYLES */
+        .data-management-panel {
+            background-color: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        
+        .data-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .data-stat-item {
+            text-align: center;
+        }
+        
+        .data-stat-label {
+            font-size: 0.625rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .data-stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .data-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .data-action-btn {
+            padding: 0.5rem;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+        
+        .data-action-btn.export {
+            background: #10b981;
+            color: white;
+        }
+        
+        .data-action-btn.export:hover {
+            background: #059669;
+        }
+        
+        .data-action-btn.import {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .data-action-btn.import:hover {
+            background: #2563eb;
+        }
+        
+        .data-action-btn.backup {
+            background: #8b5cf6;
+            color: white;
+        }
+        
+        .data-action-btn.backup:hover {
+            background: #7c3aed;
+        }
+        
+        .data-action-btn.reset {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .data-action-btn.reset:hover {
+            background: #dc2626;
+        }
+        
+        /* AUTO-SAVE INDICATOR */
+        .auto-save-indicator {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        
+        .auto-save-indicator.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .auto-save-indicator.saving {
+            background: #f59e0b;
+        }
+        
+        /* STORAGE STATUS */
+        .storage-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f0f9ff;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #0ea5e9;
+        }
+        
+        .storage-icon {
+            font-size: 1.25rem;
+        }
+        
+        .storage-info {
+            flex: 1;
+            margin-left: 0.5rem;
+        }
+        
+        .storage-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .storage-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e40af;
+        }
+        
+        .storage-status.saved {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+        
+        /* LIVE WALK NAVIGATION STYLES */
+        .live-nav-panel {
+            background-color: #f5f3ff;
+            border: 2px solid #8b5cf6;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        
+        .live-nav-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        
+        .live-nav-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .live-nav-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-inactive {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .status-walking {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .nav-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.25rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .nav-control-btn {
+            padding: 0.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+        
+        .nav-control-btn:hover {
+            background: #2563eb;
+        }
+        
+        .nav-control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .nav-control-btn.turn-left { background: #f59e0b; }
+        .nav-control-btn.turn-left:hover { background: #d97706; }
+        
+        .nav-control-btn.turn-right { background: #10b981; }
+        .nav-control-btn.turn-right:hover { background: #059669; }
+        
+        .nav-control-btn.center { background: #6b7280; }
+        .nav-control-btn.center:hover { background: #4b5563; }
+        
+        .nav-control-icon {
+            font-size: 1.25rem;
+        }
+        
+        .nav-control-label {
+            font-size: 0.75rem;
+        }
+        
+        .walk-data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .walk-data-item {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        
+        .walk-data-label {
+            font-size: 0.625rem;
+            color: #6b7280;
+            margin-bottom: 0.125rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .walk-data-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .walk-data-unit {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-left: 0.125rem;
+        }
+        
+        .step-counter-display {
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            color: white;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .step-count {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .step-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .heading-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .compass {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .compass-arrow {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.2s ease;
+        }
+        
+        .heading-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .walk-action-buttons {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .walk-action-btn {
+            flex: 1;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .walk-action-btn.primary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .walk-action-btn.primary:hover {
+            background: #059669;
+        }
+        
+        .walk-action-btn.secondary {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .walk-action-btn.secondary:hover {
+            background: #d97706;
+        }
+        
+        .walk-action-btn.danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .walk-action-btn.danger:hover {
+            background: #dc2626;
+        }
+        
+        .sensor-status {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+        }
+        
+        /* Real-time position marker */
+        .current-position-marker {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Overlay for step counter */
+        .step-counter-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 0.5rem;
+            border: 2px solid #3b82f6;
+            padding: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            min-width: 200px;
+        }
+        
+        .step-counter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-counter-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .step-counter-badge {
+            background: #3b82f6;
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .step-counter-value {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+            animation: stepPulse 0.3s ease;
+        }
+        
+        @keyframes stepPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* iOS Permission Button */
+        .ios-permission-btn {
+            background: linear-gradient(135deg, #007aff, #5856d6);
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s;
+        }
+        
+        .ios-permission-btn:hover {
+            background: linear-gradient(135deg, #0056cc, #4a47c9);
+            transform: translateY(-1px);
+        }
+        
+        .ios-permission-btn:active {
+            transform: translateY(0);
+        }
+        
+        .ios-permission-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .permission-required {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+        
+        .permission-granted {
+            background-color: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+        
+        .ios-note {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+        }
+        
+        /* Path progress */
+        .path-progress {
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .path-progress-fill {
+            height: 100%;
+            background-color: #10b981;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .path-deviation {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
+        }
+        
+        .deviation-low {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .deviation-high {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .flex { display: flex; }
+        .gap-2 { gap: 0.5rem; }
+        .w-full { width: 100%; }
+        .flex-1 { flex: 1; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .p-2 { padding: 0.5rem; }
+        .p-4 { padding: 1rem; }
+        .rounded { border-radius: 0.375rem; }
+        .bg-gray-200 { background-color: #e5e7eb; }
+        .bg-blue-500 { background-color: #3b82f6; }
+        .text-white { color: white; }
+        .text-gray-600 { color: #4b5563; }
+        .text-gray-800 { color: #1f2937; }
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // Icon components
+        const UploadIcon = () => React.createElement('span', { className: 'icon' }, '📤');
+        const SaveIcon = () => React.createElement('span', { className: 'icon' }, '💾');
+        const NavigationIcon = () => React.createElement('span', { className: 'icon' }, '🧭');
+        const TrashIcon = () => React.createElement('span', { className: 'icon' }, '🗑️');
+        const PinIcon = () => React.createElement('span', { className: 'icon' }, '📍');
+        const PlayIcon = () => React.createElement('span', { className: 'icon' }, '▶️');
+        const ZoomInIcon = () => React.createElement('span', { className: 'icon' }, '➕');
+        const ZoomOutIcon = () => React.createElement('span', { className: 'icon' }, '➖');
+        const ResetZoomIcon = () => React.createElement('span', { className: 'icon' }, '🔄');
+        const WalkIcon = () => React.createElement('span', { className: 'icon' }, '🚶');
+        const StepIcon = () => React.createElement('span', { className: 'icon' }, '👣');
+        const CompassIcon = () => React.createElement('span', { className: 'icon' }, '🧭');
+        const SensorIcon = () => React.createElement('span', { className: 'icon' }, '⚡');
+        const PauseIcon = () => React.createElement('span', { className: 'icon' }, '⏸️');
+        const LoginIcon = () => React.createElement('span', { className: 'icon' }, '🔐');
+        const LogoutIcon = () => React.createElement('span', { className: 'icon' }, '🚪');
+        const IOSPermissionIcon = () => React.createElement('span', { className: 'icon' }, '📱');
+        const SchoolIcon = () => React.createElement('span', { className: 'icon' }, '🏫');
+        const ExportIcon = () => React.createElement('span', { className: 'icon' }, '📥');
+        const ImportIcon = () => React.createElement('span', { className: 'icon' }, '📤');
+        const BackupIcon = () => React.createElement('span', { className: 'icon' }, '💾');
+        const ResetIcon = () => React.createElement('span', { className: 'icon' }, '🗑️');
+        const StorageIcon = () => React.createElement('span', { className: 'icon' }, '💽');
+
+        const FloorPlanNavigator = () => {
+            // LIVE WALK NAVIGATION STATE
+            const [isLiveNavigation, setIsLiveNavigation] = useState(false);
+            const [isMotionTracking, setIsMotionTracking] = useState(false);
+            const [stepCount, setStepCount] = useState(0);
+            const [heading, setHeading] = useState(0);
+            const [distanceMeters, setDistanceMeters] = useState(0);
+            const [currentPosition, setCurrentPosition] = useState({ x: 400, y: 300 });
+            const [currentDirection, setCurrentDirection] = useState('E');
+            const [pxPerMeter, setPxPerMeter] = useState(60);
+            const [isMotionAvailable, setIsMotionAvailable] = useState(false);
+            const [sensorStatus, setSensorStatus] = useState('Checking sensors...');
+            const [isUsingDeviceOrientation, setIsUsingDeviceOrientation] = useState(false);
+            const [lastMag, setLastMag] = useState(0);
+            const [lastStepTime, setLastStepTime] = useState(0);
+            const [threshold, setThreshold] = useState(1.2);
+            const [listeningMotion, setListeningMotion] = useState(false);
+            const [listeningOrient, setListeningOrient] = useState(false);
+            const [liveNavPath, setLiveNavPath] = useState([]);
+            const [isOnLivePath, setIsOnLivePath] = useState(true);
+            const [nextLiveWaypoint, setNextLiveWaypoint] = useState(0);
+            const [livePathProgress, setLivePathProgress] = useState(0);
+            const [livePathDistance, setLivePathDistance] = useState(0);
+            
+            // iOS Permission State
+            const [isIOS, setIsIOS] = useState(false);
+            const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
+            const [orientationPermissionGranted, setOrientationPermissionGranted] = useState(false);
+            const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+
+            // EXISTING STATE
+            const [floorPlan, setFloorPlan] = useState(null);
+            const [mode, setMode] = useState('navigate');
+            const [locations, setLocations] = useState([]);
+            const [paths, setPaths] = useState([]);
+            const [currentPath, setCurrentPath] = useState([]);
+            const [trainingFrom, setTrainingFrom] = useState('');
+            const [trainingTo, setTrainingTo] = useState('');
+            const [navigateFrom, setNavigateFrom] = useState('');
+            const [navigateTo, setNavigateTo] = useState('');
+            const [activePath, setActivePath] = useState(null);
+            const [isNavigating, setIsNavigating] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [addingLocation, setAddingLocation] = useState(false);
+            const [newLocationName, setNewLocationName] = useState('');
+            const [pendingLocation, setPendingLocation] = useState(null);
+            const [trainingInstructions] = useState(['Walk straight', 'Turn left', 'Turn right', 'Continue straight']);
+            const [currentInstruction, setCurrentInstruction] = useState('');
+            const [pathInstructions, setPathInstructions] = useState([]);
+            const [newPathName, setNewPathName] = useState('');
+            const [zoom, setZoom] = useState(1);
+            const [offset, setOffset] = useState({ x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            const [selectedPathIndex, setSelectedPathIndex] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            const [deviceType, setDeviceType] = useState('desktop');
+            
+            // Data management state
+            const [lastSaveTime, setLastSaveTime] = useState(null);
+            const [isSaving, setIsSaving] = useState(false);
+            const [showDataManagement, setShowDataManagement] = useState(false);
+            const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+            const [saveNotification, setSaveNotification] = useState('');
+            const [jsonDataLoaded, setJsonDataLoaded] = useState(false);
+            const [storageStatus, setStorageStatus] = useState('Checking storage...');
+
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const positionMarkerRef = useRef(null);
+            const importFileInputRef = useRef(null);
+            const saveTimeoutRef = useRef(null);
+
+            // =============================================
+            // AUTOMATIC LOCALSTORAGE MANAGEMENT (BACKEND)
+            // =============================================
+            
+            const STORAGE_KEY = 'school_navigation_data';
+            const BACKUP_KEY = 'school_navigation_backup';
+            
+            // Save all data to localStorage (automatic backend)
+            const saveToLocalStorage = () => {
+                if (!autoSaveEnabled) return;
+                
+                setIsSaving(true);
+                setSaveNotification('Auto-saving...');
+                setStorageStatus('Saving...');
+                
+                try {
+                    const data = {
+                        version: '3.0',
+                        appName: 'School Navigation System',
+                        lastUpdated: new Date().toISOString(),
+                        data: {
+                            floorPlan: floorPlan,
+                            locations: locations,
+                            paths: paths,
+                            metadata: {
+                                totalLocations: locations.length,
+                                totalPaths: paths.length,
+                                adminMode: isAdmin,
+                                lastMode: mode
+                            }
+                        }
+                    };
+                    
+                    const dataStr = JSON.stringify(data);
+                    
+                    // Save to primary storage
+                    localStorage.setItem(STORAGE_KEY, dataStr);
+                    
+                    // Create a backup (keep last 3 backups)
+                    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+                    backups.unshift({
+                        timestamp: new Date().toISOString(),
+                        data: dataStr.substring(0, 1000) + '...' // Store truncated for memory
+                    });
+                    
+                    // Keep only last 3 backups
+                    if (backups.length > 3) {
+                        backups.pop();
+                    }
+                    localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+                    
+                    setLastSaveTime(new Date().toISOString());
+                    setStorageStatus('Saved to browser storage');
+                    
+                    setTimeout(() => {
+                        setSaveNotification('Auto-saved!');
+                        setTimeout(() => setSaveNotification(''), 1500);
+                    }, 300);
+                    
+                } catch (error) {
+                    console.error('Save error:', error);
+                    setSaveNotification('Save failed');
+                    setStorageStatus('Storage error');
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+            
+            // Load data from localStorage (automatic on startup)
+            const loadFromLocalStorage = () => {
+                try {
+                    const savedData = localStorage.getItem(STORAGE_KEY);
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        if (data.data && data.version) {
+                            applyLoadedData(data.data);
+                            setLastSaveTime(data.lastUpdated || new Date().toISOString());
+                            setJsonDataLoaded(true);
+                            setStorageStatus('Loaded from browser storage');
+                            console.log('Data loaded from localStorage');
+                            return true;
+                        }
+                    }
+                    setStorageStatus('No saved data found');
+                    return false;
+                } catch (error) {
+                    console.error('Load error:', error);
+                    setStorageStatus('Error loading data');
+                    return false;
+                }
+            };
+            
+            const applyLoadedData = (data) => {
+                if (data.floorPlan) {
+                    setFloorPlan(data.floorPlan);
+                }
+                
+                if (data.locations && Array.isArray(data.locations)) {
+                    setLocations(data.locations);
+                }
+                
+                if (data.paths && Array.isArray(data.paths)) {
+                    setPaths(data.paths);
+                }
+                
+                if (data.metadata && data.metadata.lastMode) {
+                    setMode(data.metadata.lastMode);
+                }
+                
+                // Set default navigate locations if available
+                if (data.locations && data.locations.length > 0) {
+                    setNavigateFrom(data.locations[0].name);
+                    if (data.locations.length > 1) {
+                        setNavigateTo(data.locations[1].name);
+                    }
+                }
+            };
+            
+            // Auto-save with debounce
+            const autoSaveData = () => {
+                if (!autoSaveEnabled || !isAdmin) return;
+                
+                // Clear existing timeout
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+                
+                // Set new timeout for saving (1 second delay)
+                saveTimeoutRef.current = setTimeout(() => {
+                    saveToLocalStorage();
+                }, 1000);
+            };
+            
+            // Manual save (triggers immediate save)
+            const manualSave = () => {
+                saveToLocalStorage();
+                setSaveNotification('Manually saved!');
+                setTimeout(() => setSaveNotification(''), 2000);
+            };
+            
+            // Export data to JSON file (manual export)
+            const exportToJSONFile = () => {
+                try {
+                    const data = {
+                        version: '3.0',
+                        appName: 'School Navigation System',
+                        exportDate: new Date().toISOString(),
+                        data: {
+                            floorPlan: floorPlan,
+                            locations: locations,
+                            paths: paths,
+                            metadata: {
+                                totalLocations: locations.length,
+                                totalPaths: paths.length,
+                                adminMode: isAdmin
+                            }
+                        }
+                    };
+                    
+                    const dataStr = JSON.stringify(data, null, 2);
+                    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                    const exportFileDefaultName = `school-navigation-export-${new Date().toISOString().split('T')[0]}.json`;
+                    
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', exportFileDefaultName);
+                    linkElement.click();
+                    
+                    setSaveNotification('Exported to JSON file!');
+                    setTimeout(() => setSaveNotification(''), 2000);
+                    
+                } catch (error) {
+                    console.error('Export error:', error);
+                    setSaveNotification('Export failed');
+                }
+            };
+            
+            // Import data from JSON file
+            const importFromJSONFile = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        if (!data.data || !data.version) {
+                            throw new Error('Invalid data format');
+                        }
+                        
+                        if (confirm(`Import data from ${data.exportDate || 'unknown date'}?\nLocations: ${data.data.locations?.length || 0}\nPaths: ${data.data.paths?.length || 0}`)) {
+                            applyLoadedData(data.data);
+                            saveToLocalStorage(); // Save imported data to localStorage
+                            setSaveNotification('Data imported and saved!');
+                            setTimeout(() => setSaveNotification(''), 2000);
+                        }
+                    } catch (error) {
+                        console.error('Import error:', error);
+                        alert('Error importing data. Please check the file format.');
+                    }
+                    
+                    // Reset the file input
+                    event.target.value = '';
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            const triggerImport = () => {
+                importFileInputRef.current?.click();
+            };
+            
+            const resetAllData = () => {
+                if (confirm('Are you sure you want to reset ALL data?\n\nThis will delete:\n• All locations\n• All paths\n• Floor plan\n\nThis action cannot be undone!')) {
+                    setFloorPlan(null);
+                    setLocations([]);
+                    setPaths([]);
+                    setCurrentPath([]);
+                    setPathInstructions([]);
+                    setActivePath(null);
+                    setIsNavigating(false);
+                    setLastSaveTime(null);
+                    
+                    // Clear localStorage
+                    localStorage.removeItem(STORAGE_KEY);
+                    
+                    setStorageStatus('Data reset');
+                    setSaveNotification('All data reset');
+                    setTimeout(() => setSaveNotification(''), 2000);
+                }
+            };
+            
+            const restoreFromBackup = () => {
+                try {
+                    const savedData = localStorage.getItem(STORAGE_KEY);
+                    if (!savedData) {
+                        alert('No data found in storage.');
+                        return;
+                    }
+                    
+                    const data = JSON.parse(savedData);
+                    if (confirm(`Restore data from ${data.lastUpdated || 'unknown time'}?\nLocations: ${data.data.locations?.length || 0}\nPaths: ${data.data.paths?.length || 0}`)) {
+                        applyLoadedData(data.data);
+                        setSaveNotification('Data restored!');
+                        setTimeout(() => setSaveNotification(''), 2000);
+                    }
+                } catch (error) {
+                    console.error('Restore error:', error);
+                    alert('Error restoring data.');
+                }
+            };
+
+            // =============================================
+            // AUTOMATIC DATA SYNC EFFECTS
+            // =============================================
+            
+            useEffect(() => {
+                // Load data when component mounts
+                const loaded = loadFromLocalStorage();
+                if (!loaded) {
+                    console.log('Starting with fresh data');
+                }
+                
+                // Set up periodic auto-save (every 30 seconds)
+                const intervalId = setInterval(() => {
+                    if (autoSaveEnabled && isAdmin && (locations.length > 0 || paths.length > 0 || floorPlan)) {
+                        autoSaveData();
+                    }
+                }, 30000);
+                
+                return () => {
+                    clearInterval(intervalId);
+                    if (saveTimeoutRef.current) {
+                        clearTimeout(saveTimeoutRef.current);
+                    }
+                };
+            }, []);
+            
+            useEffect(() => {
+                // Auto-save when locations change
+                if (locations.length > 0 || locations.length === 0) {
+                    autoSaveData();
+                }
+            }, [locations]);
+            
+            useEffect(() => {
+                // Auto-save when paths change
+                if (paths.length > 0 || paths.length === 0) {
+                    autoSaveData();
+                }
+            }, [paths]);
+            
+            useEffect(() => {
+                // Auto-save when floor plan changes
+                if (floorPlan) {
+                    autoSaveData();
+                }
+            }, [floorPlan]);
+            
+            useEffect(() => {
+                // Auto-save when mode changes (admin only)
+                if (isAdmin) {
+                    autoSaveData();
+                }
+            }, [mode]);
+
+            // =============================================
+            // IOS PERMISSION FUNCTIONS
+            // =============================================
+            
+            const detectIOS = () => {
+                const userAgent = navigator.userAgent;
+                const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+                setIsIOS(isIOSDevice);
+                return isIOSDevice;
+            };
+            
+            const checkIOSPermissions = () => {
+                const isIOSDevice = detectIOS();
+                if (isIOSDevice) {
+                    const needsMotionPermission = typeof DeviceMotionEvent !== 'undefined' && 
+                                                typeof DeviceMotionEvent.requestPermission === 'function';
+                    const needsOrientationPermission = typeof DeviceOrientationEvent !== 'undefined' && 
+                                                      typeof DeviceOrientationEvent.requestPermission === 'function';
+                    
+                    if (needsMotionPermission || needsOrientationPermission) {
+                        setSensorStatus('iOS: Tap "Enable Motion & Orientation" button');
+                        return false;
+                    }
+                }
+                return true;
+            };
+            
+            const requestIOSPermissions = async () => {
+                setIsRequestingPermission(true);
+                setSensorStatus('Requesting permissions...');
+                
+                try {
+                    // Request DeviceMotion permission
+                    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                        const motionResponse = await DeviceMotionEvent.requestPermission();
+                        if (motionResponse === 'granted') {
+                            setMotionPermissionGranted(true);
+                            setSensorStatus('Motion: Granted');
+                            startMotionTracking();
+                        } else {
+                            setMotionPermissionGranted(false);
+                            setSensorStatus('Motion: Denied');
+                        }
+                    }
+                    
+                    // Request DeviceOrientation permission
+                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        const orientationResponse = await DeviceOrientationEvent.requestPermission();
+                        if (orientationResponse === 'granted') {
+                            setOrientationPermissionGranted(true);
+                            setSensorStatus(prev => prev + ' | Orientation: Granted');
+                            startOrientationTracking();
+                        } else {
+                            setOrientationPermissionGranted(false);
+                            setSensorStatus(prev => prev + ' | Orientation: Denied');
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('Error requesting permissions:', error);
+                    setSensorStatus('Permission request failed');
+                } finally {
+                    setIsRequestingPermission(false);
+                }
+            };
+            
+            const requestPermissions = async () => {
+                if (detectIOS()) {
+                    await requestIOSPermissions();
+                } else {
+                    startMotionTracking();
+                    startOrientationTracking();
+                    setSensorStatus('Motion tracking started');
+                }
+            };
+
+            // =============================================
+            // LIVE WALK NAVIGATION FUNCTIONS
+            // =============================================
+            
+            const startLiveNavigation = () => {
+                if (!activePath || !activePath.path || activePath.path.length === 0) {
+                    alert('Please select a path to navigate first');
+                    return;
+                }
+                
+                if (detectIOS() && (!motionPermissionGranted || !orientationPermissionGranted)) {
+                    alert('Please enable motion and orientation permissions first using the "Enable Motion & Orientation" button');
+                    return;
+                }
+                
+                setIsLiveNavigation(true);
+                setStepCount(0);
+                setDistanceMeters(0);
+                setCurrentPosition({ x: activePath.path[0].x, y: activePath.path[0].y });
+                setNextLiveWaypoint(0);
+                setLiveNavPath(activePath.path);
+                setLivePathProgress(0);
+                
+                let totalDistance = 0;
+                for (let i = 1; i < activePath.path.length; i++) {
+                    const dx = activePath.path[i].x - activePath.path[i-1].x;
+                    const dy = activePath.path[i].y - activePath.path[i-1].y;
+                    totalDistance += Math.sqrt(dx * dx + dy * dy);
+                }
+                setLivePathDistance(totalDistance);
+                
+                if (isMotionAvailable) {
+                    if (detectIOS()) {
+                        if (motionPermissionGranted) {
+                            startMotionTracking();
+                        }
+                    } else {
+                        startMotionTracking();
+                    }
+                }
+                
+                alert('Live navigation started! Start walking or use simulation controls.');
+            };
+            
+            const stopLiveNavigation = () => {
+                setIsLiveNavigation(false);
+                setIsMotionTracking(false);
+                stopMotionTracking();
+            };
+            
+            const simulateStep = () => {
+                const strideMeters = 0.75;
+                const movePx = strideMeters * pxPerMeter;
+                
+                const rad = heading * Math.PI / 180;
+                const newX = currentPosition.x + Math.cos(rad) * movePx;
+                const newY = currentPosition.y + Math.sin(rad) * movePx;
+                
+                setStepCount(prev => prev + 1);
+                setDistanceMeters(prev => prev + strideMeters);
+                setCurrentPosition({ x: newX, y: newY });
+                
+                if (liveNavPath.length > 0) {
+                    updatePathProgress(newX, newY);
+                }
+                
+                if (positionMarkerRef.current) {
+                    positionMarkerRef.current.classList.add('step-animation');
+                    setTimeout(() => {
+                        if (positionMarkerRef.current) {
+                            positionMarkerRef.current.classList.remove('step-animation');
+                        }
+                    }, 300);
+                }
+            };
+            
+            const updatePathProgress = (x, y) => {
+                if (liveNavPath.length === 0) return;
+                
+                let closestDist = Infinity;
+                let closestIndex = 0;
+                
+                for (let i = 0; i < liveNavPath.length; i++) {
+                    const dx = liveNavPath[i].x - x;
+                    const dy = liveNavPath[i].y - y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestIndex = i;
+                    }
+                }
+                
+                setIsOnLivePath(closestDist < 50);
+                setNextLiveWaypoint(closestIndex);
+                
+                let accumulatedDistance = 0;
+                for (let i = 1; i <= closestIndex && i < liveNavPath.length; i++) {
+                    const dx = liveNavPath[i].x - liveNavPath[i-1].x;
+                    const dy = liveNavPath[i].y - liveNavPath[i-1].y;
+                    accumulatedDistance += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                const progress = (accumulatedDistance / livePathDistance) * 100;
+                setLivePathProgress(Math.min(100, Math.max(0, progress)));
+            };
+            
+            const turnLeft = () => {
+                const newHeading = (heading - 15 + 360) % 360;
+                setHeading(newHeading);
+                setIsUsingDeviceOrientation(false);
+                updateDirectionText(newHeading);
+            };
+            
+            const turnRight = () => {
+                const newHeading = (heading + 15) % 360;
+                setHeading(newHeading);
+                setIsUsingDeviceOrientation(false);
+                updateDirectionText(newHeading);
+            };
+            
+            const faceForward = () => {
+                if (!isUsingDeviceOrientation) {
+                    setHeading(0);
+                    updateDirectionText(0);
+                }
+            };
+            
+            const updateDirectionText = (headingDegrees) => {
+                if (headingDegrees >= 315 || headingDegrees < 45) {
+                    setCurrentDirection('E');
+                } else if (headingDegrees >= 45 && headingDegrees < 135) {
+                    setCurrentDirection('S');
+                } else if (headingDegrees >= 135 && headingDegrees < 225) {
+                    setCurrentDirection('W');
+                } else {
+                    setCurrentDirection('N');
+                }
+            };
+            
+            const handleMotion = (e) => {
+                const a = e.acceleration || e.accelerationIncludingGravity;
+                if (!a) return;
+                
+                const ax = a.x || 0;
+                const ay = a.y || 0;
+                const az = a.z || 0;
+                const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+                const delta = Math.abs(mag - lastMag);
+                
+                if (delta > threshold) {
+                    const now = Date.now();
+                    if (now - lastStepTime > 300) {
+                        setLastStepTime(now);
+                        simulateStep();
+                    }
+                }
+                
+                setLastMag(mag);
+            };
+            
+            const handleOrientation = (e) => {
+                let alpha = e.alpha;
+                if (alpha == null) return;
+                
+                const newHeading = (90 - alpha + 360) % 360;
+                setHeading(newHeading);
+                setIsUsingDeviceOrientation(true);
+                updateDirectionText(newHeading);
+            };
+            
+            const startMotionTracking = () => {
+                if (listeningMotion) return;
+                
+                if ('ondevicemotion' in window) {
+                    window.addEventListener('devicemotion', handleMotion, { passive: true });
+                    setListeningMotion(true);
+                    setIsMotionTracking(true);
+                    setSensorStatus(prev => prev + ' | Motion: Active');
+                } else {
+                    setSensorStatus(prev => prev + ' | Motion: Not available');
+                }
+            };
+            
+            const startOrientationTracking = () => {
+                if (listeningOrient) return;
+                
+                if ('ondeviceorientation' in window) {
+                    window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+                    setListeningOrient(true);
+                    setIsUsingDeviceOrientation(true);
+                    setSensorStatus(prev => prev + ' | Orientation: Active');
+                } else {
+                    setSensorStatus(prev => prev + ' | Orientation: Not available');
+                }
+            };
+            
+            const stopMotionTracking = () => {
+                if (listeningMotion) {
+                    window.removeEventListener('devicemotion', handleMotion);
+                    setListeningMotion(false);
+                }
+                if (listeningOrient) {
+                    window.removeEventListener('deviceorientation', handleOrientation);
+                    setListeningOrient(false);
+                }
+                setIsMotionTracking(false);
+                setSensorStatus('Tracking stopped');
+            };
+            
+            const resetNavigation = () => {
+                setStepCount(0);
+                setDistanceMeters(0);
+                if (activePath && activePath.path.length > 0) {
+                    setCurrentPosition({ x: activePath.path[0].x, y: activePath.path[0].y });
+                }
+                setLivePathProgress(0);
+                setNextLiveWaypoint(0);
+            };
+
+            // =============================================
+            // EXISTING FUNCTIONS
+            // =============================================
+            
+            const detectDeviceType = () => {
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isMobile = /mobile|iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(userAgent);
+                const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
+                
+                if (isMobile && !isTablet) {
+                    setDeviceType('mobile');
+                } else if (isTablet) {
+                    setDeviceType('tablet');
+                } else {
+                    setDeviceType('desktop');
+                }
+            };
+
+            const handleLogin = () => {
+                const ADMIN_CREDENTIALS = {
+                    username: 'admin',
+                    password: 'admin123'
+                };
+                
+                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPassword('');
+                    localStorage.setItem('nav-admin', 'true');
+                    alert('Admin login successful!');
+                } else {
+                    alert('Invalid credentials');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsAdmin(false);
+                setMode('navigate');
+                localStorage.removeItem('nav-admin');
+                alert('Logged out successfully');
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setFloorPlan(event.target.result);
+                        setZoom(1);
+                        setOffset({ x: 0, y: 0 });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const drawCanvas = () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !floorPlan) return;
+
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    const displayWidth = img.width * zoom;
+                    const displayHeight = img.height * zoom;
+                    
+                    canvas.width = displayWidth;
+                    canvas.height = displayHeight;
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(offset.x, offset.y);
+                    
+                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+                    locations.forEach(loc => {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.beginPath();
+                        ctx.arc(loc.x * zoom, loc.y * zoom, 8 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.fillStyle = '#000';
+                        ctx.font = `${14 * zoom}px Arial`;
+                        ctx.fillText(loc.name, loc.x * zoom + 12 * zoom, loc.y * zoom + 5 * zoom);
+                    });
+
+                    if (pendingLocation) {
+                        ctx.fillStyle = '#10b981';
+                        ctx.beginPath();
+                        ctx.arc(pendingLocation.x * zoom, pendingLocation.y * zoom, 10 * zoom, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2 * zoom;
+                        ctx.stroke();
+                    }
+
+                    if (mode === 'train' && currentPath.length > 0) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(currentPath[0].x * zoom, currentPath[0].y * zoom);
+                        currentPath.forEach(point => ctx.lineTo(point.x * zoom, point.y * zoom));
+                        ctx.stroke();
+                        
+                        currentPath.forEach((point, index) => {
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(point.x * zoom, point.y *zoom, 5 * zoom, 0, 2 * Math.PI);
+                            ctx.fill();
+                            
+                            ctx.fillStyle = '#000';
+                            ctx.font = `${12 * zoom}px Arial`;
+                            ctx.fillText(`${index + 1}`, point.x * zoom + 8 * zoom, point.y * zoom + 5 * zoom);
+                        });
+                        
+                        if (trainingFrom) {
+                            const fromLoc = locations.find(l => l.name === trainingFrom);
+                            if (fromLoc) {
+                                ctx.fillStyle = '#10b981';
+                                ctx.beginPath();
+                                ctx.arc(fromLoc.x * zoom, fromLoc.y * zoom, 12 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 2 * zoom;
+                                ctx.stroke();
+                            }
+                        }
+                        
+                        if (trainingTo) {
+                            const toLoc = locations.find(l => l.name === trainingTo);
+                            if (toLoc) {
+                                ctx.fillStyle = '#ef4444';
+                                ctx.beginPath();
+                                ctx.arc(toLoc.x * zoom, toLoc.y * zoom, 12 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 2 * zoom;
+                                ctx.stroke();
+                            }
+                        }
+                    }
+
+                    if (activePath && activePath.path && activePath.path.length > 0) {
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 4 * zoom;
+                        ctx.lineJoin = 'round';
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        
+                        if (activePath.path[0]) {
+                            ctx.moveTo(activePath.path[0].x * zoom, activePath.path[0].y * zoom);
+                        }
+                        
+                        for (let i = 1; i < activePath.path.length; i++) {
+                            if (activePath.path[i]) {
+                                ctx.lineTo(activePath.path[i].x * zoom, activePath.path[i].y * zoom);
+                            }
+                        }
+                        ctx.stroke();
+                        
+                        activePath.path.forEach((point, index) => {
+                            if (point) {
+                                ctx.fillStyle = '#ef4444';
+                                ctx.beginPath();
+                                ctx.arc(point.x * zoom, point.y * zoom, 6 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 2 * zoom;
+                                ctx.stroke();
+                                
+                                ctx.fillStyle = '#fff';
+                                ctx.font = `bold ${10 * zoom}px Arial`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(`${index + 1}`, point.x * zoom, point.y * zoom);
+                            }
+                        });
+                        
+                        if (activePath.from && activePath.to) {
+                            const fromLoc = locations.find(l => l.name === activePath.from);
+                            const toLoc = locations.find(l => l.name === activePath.to);
+                            
+                            if (fromLoc) {
+                                ctx.fillStyle = '#10b981';
+                                ctx.beginPath();
+                                ctx.arc(fromLoc.x * zoom, fromLoc.y * zoom, 15 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 3 * zoom;
+                                ctx.stroke();
+                                
+                                ctx.fillStyle = '#fff';
+                                ctx.font = `bold ${12 * zoom}px Arial`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText('START', fromLoc.x * zoom, fromLoc.y * zoom);
+                            }
+                            
+                            if (toLoc) {
+                                ctx.fillStyle = '#ef4444';
+                                ctx.beginPath();
+                                ctx.arc(toLoc.x * zoom, toLoc.y * zoom, 15 * zoom, 0, 2 * Math.PI);
+                                ctx.fill();
+                                ctx.strokeStyle = '#fff';
+                                ctx.lineWidth = 3 * zoom;
+                                ctx.stroke();
+                                
+                                ctx.fillStyle = '#fff';
+                                ctx.font = `bold ${12 * zoom}px Arial`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText('END', toLoc.x * zoom, toLoc.y * zoom);
+                            }
+                        }
+                    }
+                    
+                    ctx.restore();
+                };
+                img.src = floorPlan;
+            };
+
+            useEffect(() => {
+                drawCanvas();
+            }, [floorPlan, locations, currentPath, activePath, zoom, offset, pendingLocation, trainingFrom, trainingTo]);
+
+            const handleCanvasClick = (e) => {
+                if (!canvasRef.current) return;
+                
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - offset.x) / zoom;
+                const y = (e.clientY - rect.top - offset.y) / zoom;
+
+                if (addingLocation) {
+                    setPendingLocation({ x, y });
+                } else if (mode === 'train' && isAdmin) {
+                    addPathPoint(x, y);
+                }
+            };
+
+            const zoomIn = () => {
+                setZoom(prevZoom => Math.min(prevZoom * 1.2, 5));
+            };
+
+            const zoomOut = () => {
+                setZoom(prevZoom => Math.max(prevZoom / 1.2, 0.1));
+            };
+
+            const resetZoom = () => {
+                setZoom(1);
+                setOffset({ x: 0, y: 0 });
+            };
+
+            const handleMouseDown = (e) => {
+                if (e.button !== 0) return;
+                setIsDragging(true);
+                setDragStart({
+                    x: e.clientX - offset.x,
+                    y: e.clientY - offset.y
+                });
+                if (canvasRef.current) {
+                    canvasRef.current.style.cursor = 'grabbing';
+                }
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                
+                const newOffset = {
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                };
+                
+                setOffset(newOffset);
+            };
+
+            const handleMouseUp = () => {
+                setIsDragging(false);
+                if (canvasRef.current) {
+                    canvasRef.current.style.cursor = 'grab';
+                }
+            };
+
+            const handleModeChange = (newMode) => {
+                if ((newMode === 'view' || newMode === 'train') && !isAdmin) {
+                    alert('Admin access required for this mode');
+                    return;
+                }
+                setMode(newMode);
+                
+                if (newMode !== 'train') {
+                    setCurrentPath([]);
+                    setPathInstructions([]);
+                }
+            };
+
+            const startAddingLocation = () => {
+                if (!isAdmin) {
+                    alert('Admin access required to add locations');
+                    return;
+                }
+                setAddingLocation(true);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const confirmAddLocation = () => {
+                if (!newLocationName.trim()) {
+                    alert('Please enter a location name');
+                    return;
+                }
+                if (!pendingLocation) {
+                    alert('Please click on the floor plan to place the location');
+                    return;
+                }
+                setLocations([...locations, { 
+                    name: newLocationName.trim(), 
+                    x: pendingLocation.x, 
+                    y: pendingLocation.y 
+                }]);
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const cancelAddLocation = () => {
+                setAddingLocation(false);
+                setNewLocationName('');
+                setPendingLocation(null);
+            };
+
+            const startNavigation = () => {
+                if (!navigateFrom || !navigateTo) {
+                    alert('Please select both "From" and "To" locations');
+                    return;
+                }
+
+                const path = paths.find(p => 
+                    p.from === navigateFrom && p.to === navigateTo
+                );
+
+                if (!path) {
+                    alert(`No path found between "${navigateFrom}" and "${navigateTo}"`);
+                    return;
+                }
+
+                if (!path.path || path.path.length === 0) {
+                    alert('Selected path has no route points. Please train this path first.');
+                    return;
+                }
+
+                setActivePath(path);
+                setIsNavigating(true);
+                setCurrentStep(0);
+                
+                drawCanvas();
+                
+                alert(`Navigation started from "${navigateFrom}" to "${navigateTo}"! Follow the instructions.`);
+            };
+
+            const stopNavigation = () => {
+                setIsNavigating(false);
+                setActivePath(null);
+                setCurrentStep(0);
+            };
+
+            const nextStep = () => {
+                if (!activePath || !isNavigating) return;
+                
+                const nextIdx = currentStep + 1;
+                if (nextIdx < activePath.instructions.length) {
+                    setCurrentStep(nextIdx);
+                } else {
+                    stopNavigation();
+                }
+            };
+
+            const startTraining = () => {
+                setCurrentPath([]);
+                setPathInstructions([]);
+                setNewPathName('');
+                alert('Click on the floor plan to draw a path. Each click adds a point to your path.');
+            };
+            
+            const addPathPoint = (x, y) => {
+                if (mode !== 'train' || !isAdmin) return;
+                
+                setCurrentPath([...currentPath, { x, y }]);
+                
+                if (currentPath.length > 0) {
+                    const newInstruction = `From point ${currentPath.length} to ${currentPath.length + 1}: Continue forward`;
+                    setPathInstructions([...pathInstructions, newInstruction]);
+                } else {
+                    const startInstruction = `Start at coordinates (${Math.round(x)}, ${Math.round(y)})`;
+                    setPathInstructions([startInstruction]);
+                }
+            };
+            
+            const addInstructionToPath = (instruction) => {
+                if (!instruction.trim()) return;
+                setPathInstructions([...pathInstructions, instruction]);
+                setCurrentInstruction('');
+            };
+            
+            const saveTrainedPath = () => {
+                if (!trainingFrom || !trainingTo) {
+                    alert('Please select both "From" and "To" locations for this path');
+                    return;
+                }
+                
+                if (currentPath.length < 2) {
+                    alert('Please draw a path with at least 2 points');
+                    return;
+                }
+                
+                if (pathInstructions.length === 0) {
+                    alert('Please add at least one instruction for this path');
+                    return;
+                }
+                
+                const pathName = newPathName.trim() || `${trainingFrom} to ${trainingTo} Path`;
+                
+                const newPath = {
+                    id: Date.now(),
+                    name: pathName,
+                    from: trainingFrom,
+                    to: trainingTo,
+                    path: [...currentPath],
+                    instructions: [...pathInstructions],
+                    dateCreated: new Date().toISOString(),
+                    totalDistance: calculatePathDistance(currentPath),
+                    pointCount: currentPath.length
+                };
+                
+                setPaths([...paths, newPath]);
+                setCurrentPath([]);
+                setPathInstructions([]);
+                setNewPathName('');
+                setTrainingFrom('');
+                setTrainingTo('');
+                drawCanvas();
+                alert(`Path "${pathName}" saved successfully! You can now use it for navigation.`);
+            };
+            
+            const calculatePathDistance = (pathPoints) => {
+                if (pathPoints.length < 2) return 0;
+                
+                let totalDistance = 0;
+                for (let i = 1; i < pathPoints.length; i++) {
+                    const dx = pathPoints[i].x - pathPoints[i-1].x;
+                    const dy = pathPoints[i].y - pathPoints[i-1].y;
+                    totalDistance += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                return Math.round(totalDistance);
+            };
+
+            const clearCurrentPath = () => {
+                if (confirm('Clear the current path drawing?')) {
+                    setCurrentPath([]);
+                    setPathInstructions([]);
+                }
+            };
+            
+            const deleteInstruction = (index) => {
+                const newInstructions = [...pathInstructions];
+                newInstructions.splice(index, 1);
+                setPathInstructions(newInstructions);
+            };
+            
+            const editInstruction = (index, newText) => {
+                const newInstructions = [...pathInstructions];
+                newInstructions[index] = newText;
+                setPathInstructions(newInstructions);
+            };
+
+            const loadData = () => {
+                const savedAdmin = localStorage.getItem('nav-admin');
+                if (savedAdmin) {
+                    setIsAdmin(true);
+                }
+            };
+
+            // =============================================
+            // DATA MANAGEMENT PANEL
+            // =============================================
+            const DataManagementPanel = () => {
+                return React.createElement('div', { className: 'data-management-panel' },
+                    React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                        React.createElement('h3', null, 'Data Management'),
+                        React.createElement('button', {
+                            onClick: () => setShowDataManagement(!showDataManagement),
+                            className: 'text-xs bg-blue-500 text-white px-2 py-1 rounded'
+                        }, showDataManagement ? 'Hide' : 'Show')
+                    ),
+                    
+                    React.createElement('div', { className: 'storage-status saved' },
+                        React.createElement('div', { className: 'storage-icon' },
+                            React.createElement(StorageIcon)
+                        ),
+                        React.createElement('div', { className: 'storage-info' },
+                            React.createElement('div', { className: 'storage-label' }, 'Browser Storage'),
+                            React.createElement('div', { className: 'storage-value' }, storageStatus)
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'data-stats' },
+                        React.createElement('div', { className: 'data-stat-item' },
+                            React.createElement('div', { className: 'data-stat-label' }, 'Locations'),
+                            React.createElement('div', { className: 'data-stat-value' }, locations.length)
+                        ),
+                        React.createElement('div', { className: 'data-stat-item' },
+                            React.createElement('div', { className: 'data-stat-label' }, 'Paths'),
+                            React.createElement('div', { className: 'data-stat-value' }, paths.length)
+                        )
+                    ),
+                    
+                    lastSaveTime && React.createElement('div', { className: 'alert-success mb-2' },
+                        `Last saved: ${new Date(lastSaveTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                    ),
+                    
+                    React.createElement('div', { className: 'alert-info mb-2' },
+                        '✓ Data auto-saves to browser storage'
+                    ),
+                    
+                    showDataManagement && React.createElement('div', null,
+                        React.createElement('div', { className: 'data-actions-grid' },
+                            React.createElement('button', {
+                                className: 'data-action-btn export',
+                                onClick: manualSave,
+                                title: 'Manually save all data',
+                                disabled: isSaving
+                            },
+                                React.createElement(SaveIcon),
+                                isSaving ? 'Saving...' : 'Save Now'
+                            ),
+                            React.createElement('button', {
+                                className: 'data-action-btn export',
+                                onClick: exportToJSONFile,
+                                title: 'Export to JSON file'
+                            },
+                                React.createElement(ExportIcon),
+                                'Export JSON'
+                            ),
+                            React.createElement('button', {
+                                className: 'data-action-btn import',
+                                onClick: triggerImport,
+                                title: 'Import from JSON file'
+                            },
+                                React.createElement(ImportIcon),
+                                'Import JSON'
+                            ),
+                            React.createElement('button', {
+                                className: `data-action-btn backup ${autoSaveEnabled ? 'bg-green-500' : ''}`,
+                                onClick: () => setAutoSaveEnabled(!autoSaveEnabled),
+                                title: 'Toggle auto-save feature'
+                            },
+                                autoSaveEnabled ? '✓ Auto-save ON' : 'Auto-save OFF'
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'mt-2' },
+                            React.createElement('button', {
+                                className: 'data-action-btn w-full mb-2',
+                                onClick: restoreFromBackup,
+                                title: 'Restore from last save'
+                            },
+                                React.createElement(BackupIcon),
+                                'Restore Last Save'
+                            ),
+                            React.createElement('button', {
+                                className: 'data-action-btn reset w-full',
+                                onClick: resetAllData,
+                                title: 'Reset all data (cannot be undone!)'
+                            },
+                                React.createElement(ResetIcon),
+                                'Reset All Data'
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'alert-warning mt-2 text-xs' },
+                            'Tip: Export JSON file for backup. Data auto-saves in browser.'
+                        ),
+                        
+                        React.createElement('input', {
+                            ref: importFileInputRef,
+                            type: 'file',
+                            accept: '.json',
+                            onChange: importFromJSONFile,
+                            className: 'hidden'
+                        })
+                    )
+                );
+            };
+
+            const LocationDropdown = ({ value, onChange, placeholder, disabled }) => {
+                return React.createElement('select', {
+                    value: value,
+                    onChange: (e) => onChange(e.target.value),
+                    className: 'w-full mb-2',
+                    disabled: disabled
+                },
+                    React.createElement('option', { value: '' }, placeholder),
+                    locations.map((loc, idx) =>
+                        React.createElement('option', { key: idx, value: loc.name }, loc.name)
+                    )
+                );
+            };
+
+            useEffect(() => {
+                detectDeviceType();
+                loadData();
+                
+                if ('DeviceMotionEvent' in window) {
+                    setIsMotionAvailable(true);
+                }
+                
+                detectIOS();
+                checkIOSPermissions();
+                
+                if (!detectIOS()) {
+                    startMotionTracking();
+                    startOrientationTracking();
+                    setSensorStatus('Motion sensors active');
+                } else {
+                    setSensorStatus('iOS: Tap "Enable Motion & Orientation" (HTTPS required)');
+                }
+            }, []);
+
+            useEffect(() => {
+                if (positionMarkerRef.current && floorPlan && isLiveNavigation) {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    const x = currentPosition.x * zoom + offset.x;
+                    const y = currentPosition.y * zoom + offset.y;
+                    
+                    positionMarkerRef.current.style.left = `${rect.left + x}px`;
+                    positionMarkerRef.current.style.top = `${rect.top + y}px`;
+                }
+            }, [currentPosition, zoom, offset, floorPlan, isLiveNavigation]);
+
+            // =============================================
+            // AUTO-SAVE NOTIFICATION COMPONENT
+            // =============================================
+            const AutoSaveNotification = () => {
+                if (!saveNotification) return null;
+                
+                return React.createElement('div', {
+                    className: `auto-save-indicator ${isSaving ? 'saving' : ''} ${saveNotification ? 'show' : ''}`
+                }, saveNotification);
+            };
+
+            // =============================================
+            // LIVE NAVIGATION PANEL
+            // =============================================
+            
+            const LiveNavigationPanel = () => {
+                const showIOSPermissionButton = detectIOS() && 
+                    (!motionPermissionGranted || !orientationPermissionGranted) &&
+                    (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function');
+                
+                return React.createElement('div', { className: 'live-nav-panel' },
+                    React.createElement('div', { className: 'live-nav-header' },
+                        React.createElement('div', { className: 'live-nav-title' },
+                            React.createElement(WalkIcon),
+                            'Live Walk Navigation'
+                        ),
+                        React.createElement('div', { 
+                            className: `live-nav-status ${isLiveNavigation ? 'status-walking' : 'status-inactive'}` 
+                        },
+                            isLiveNavigation ? 'ACTIVE' : 'INACTIVE'
+                        )
+                    ),
+                    
+                    showIOSPermissionButton && !isLiveNavigation && React.createElement('div', null,
+                        React.createElement('div', { className: 'permission-required' },
+                            'iOS Permission Required',
+                            React.createElement('br'),
+                            'For live walk navigation, iOS requires permission to access motion and orientation sensors.'
+                        ),
+                        React.createElement('button', {
+                            className: 'ios-permission-btn',
+                            onClick: requestIOSPermissions,
+                            disabled: isRequestingPermission
+                        },
+                            React.createElement(IOSPermissionIcon),
+                            isRequestingPermission ? 'Requesting...' : 'Enable Motion & Orientation (iOS)'
+                        ),
+                        React.createElement('div', { className: 'ios-note' },
+                            'Note: Requires HTTPS connection. Tap the button above, then tap "Allow" when prompted.'
+                        )
+                    ),
+                    
+                    (motionPermissionGranted || orientationPermissionGranted) && React.createElement('div', 
+                        { 
+                            className: motionPermissionGranted && orientationPermissionGranted 
+                                ? 'permission-granted' 
+                                : 'permission-required' 
+                        },
+                        motionPermissionGranted && orientationPermissionGranted 
+                            ? '✓ All permissions granted' 
+                            : motionPermissionGranted 
+                                ? '✓ Motion granted | ⚠️ Orientation needed' 
+                                : orientationPermissionGranted 
+                                    ? '⚠️ Motion needed | ✓ Orientation granted' 
+                                    : 'Permissions needed'
+                    ),
+                    
+                    React.createElement('div', { className: 'step-counter-display' },
+                        React.createElement('div', { className: 'step-count' }, stepCount),
+                        React.createElement('div', { className: 'step-label' }, 'Steps'),
+                        
+                        React.createElement('div', { className: 'walk-data-grid' },
+                            React.createElement('div', { className: 'walk-data-item' },
+                                React.createElement('div', { className: 'walk-data-label' }, 'Distance'),
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: 'walk-data-value' }, distanceMeters.toFixed(1)),
+                                    React.createElement('span', { className: 'walk-data-unit' }, 'm')
+                                )
+                            ),
+                            React.createElement('div', { className: 'walk-data-item' },
+                                React.createElement('div', { className: 'walk-data-label' }, 'Direction'),
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: 'walk-data-value' }, currentDirection),
+                                    React.createElement('span', { className: 'walk-data-unit' }, ` (${Math.round(heading)}°)`)
+                                )
+                            )
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'heading-display' },
+                        React.createElement('div', { className: 'compass' },
+                            React.createElement('div', { 
+                                className: 'compass-arrow',
+                                style: { transform: `rotate(${heading}deg)` }
+                            }, '➡️')
+                        ),
+                        React.createElement('div', { className: 'heading-text' },
+                            `Heading: ${Math.round(heading)}°`
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'nav-controls-grid' },
+                        React.createElement('button', {
+                            className: 'nav-control-btn turn-left',
+                            onClick: turnLeft,
+                            title: 'Turn 15° left',
+                            disabled: isLiveNavigation && !orientationPermissionGranted
+                        },
+                            React.createElement('div', { className: 'nav-control-icon' }, '↶'),
+                            React.createElement('div', { className: 'nav-control-label' }, 'Left')
+                        ),
+                        
+                        React.createElement('button', {
+                            className: 'nav-control-btn center',
+                            onClick: faceForward,
+                            title: 'Face forward (0°)',
+                            disabled: isLiveNavigation && !orientationPermissionGranted
+                        },
+                            React.createElement('div', { className: 'nav-control-icon' }, '↑'),
+                            React.createElement('div', { className: 'nav-control-label' }, 'Forward')
+                        ),
+                        
+                        React.createElement('button', {
+                            className: 'nav-control-btn turn-right',
+                            onClick: turnRight,
+                            title: 'Turn 15° right',
+                            disabled: isLiveNavigation && !orientationPermissionGranted
+                        },
+                            React.createElement('div', { className: 'nav-control-icon' }, '↷'),
+                            React.createElement('div', { className: 'nav-control-label' }, 'Right')
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'walk-action-buttons' },
+                        !isLiveNavigation ? (
+                            React.createElement('button', {
+                                className: 'walk-action-btn primary',
+                                onClick: startLiveNavigation,
+                                disabled: !activePath || (detectIOS() && (!motionPermissionGranted || !orientationPermissionGranted))
+                            },
+                                React.createElement(PlayIcon),
+                                ' Start Live Nav'
+                            )
+                        ) : (
+                            React.createElement('button', {
+                                className: 'walk-action-btn danger',
+                                onClick: stopLiveNavigation
+                            },
+                                React.createElement(PauseIcon),
+                                ' Stop Live Nav'
+                            )
+                        ),
+                        
+                        React.createElement('button', {
+                            className: 'walk-action-btn secondary',
+                            onClick: simulateStep,
+                            disabled: !isLiveNavigation
+                        },
+                            React.createElement(StepIcon),
+                            ' Simulate Step'
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'walk-action-buttons' },
+                        !showIOSPermissionButton && React.createElement('button', {
+                            className: 'walk-action-btn secondary',
+                            onClick: requestPermissions,
+                            disabled: isMotionAvailable && motionPermissionGranted && orientationPermissionGranted
+                        },
+                            React.createElement(SensorIcon),
+                            detectIOS() ? 'Re-request Permissions' : 'Enable Sensors'
+                        ),
+                        
+                        React.createElement('button', {
+                            className: 'walk-action-btn secondary',
+                            onClick: resetNavigation,
+                            disabled: !isLiveNavigation
+                        },
+                            React.createElement('span', { className: 'icon' }, '🔄'),
+                            ' Reset'
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'sensor-status' },
+                        React.createElement('div', null, sensorStatus),
+                        isMotionTracking && React.createElement('div', null, 'Motion tracking active'),
+                        isUsingDeviceOrientation && React.createElement('div', null, 'Using device orientation')
+                    ),
+                    
+                    isLiveNavigation && activePath && React.createElement('div', null,
+                        React.createElement('div', { className: 'progress-text' },
+                            `Path progress: ${livePathProgress.toFixed(1)}%`,
+                            React.createElement('br'),
+                            `Waypoint: ${nextLiveWaypoint + 1}/${liveNavPath.length}`
+                        ),
+                        React.createElement('div', { className: 'path-progress' },
+                            React.createElement('div', {
+                                className: 'path-progress-fill',
+                                style: { width: `${livePathProgress}%` }
+                            })
+                        ),
+                        React.createElement('div', { 
+                            className: `path-deviation ${isOnLivePath ? 'deviation-low' : 'deviation-high'}` 
+                        },
+                            isOnLivePath ? '✓ On path' : '⚠️ Off path'
+                        )
+                    )
+                );
+            };
+
+            // =============================================
+            // NAVIGATION PANEL
+            // =============================================
+            const NavigationPanel = () => {
+                return React.createElement('div', { className: 'navigation-panel' },
+                    React.createElement('h3', null, 'Navigation'),
+                    
+                    React.createElement(LocationDropdown, {
+                        value: navigateFrom,
+                        onChange: setNavigateFrom,
+                        placeholder: 'From...',
+                        disabled: isNavigating || isLiveNavigation
+                    }),
+                    React.createElement(LocationDropdown, {
+                        value: navigateTo,
+                        onChange: setNavigateTo,
+                        placeholder: 'To...',
+                        disabled: isNavigating || isLiveNavigation
+                    }),
+                    
+                    !isNavigating && !isLiveNavigation ? (
+                        React.createElement('div', null,
+                            React.createElement('button', {
+                                onClick: startNavigation,
+                                className: 'btn-danger w-full mb-2'
+                            }, React.createElement(NavigationIcon), ' Start Navigation'),
+                            
+                            React.createElement('button', {
+                                onClick: () => {
+                                    if (!navigateFrom || !navigateTo) {
+                                        alert('Please select both "From" and "To" locations first');
+                                        return;
+                                    }
+                                    const path = paths.find(p => p.from === navigateFrom && p.to === navigateTo);
+                                    if (!path) {
+                                        alert('No path found. Please train this path first.');
+                                        return;
+                                    }
+                                    setActivePath(path);
+                                    setIsNavigating(false);
+                                },
+                                className: 'btn-primary w-full'
+                            }, React.createElement(WalkIcon), ' Prepare for Live Walk')
+                        )
+                    ) : (
+                        React.createElement('div', null,
+                            React.createElement('div', { className: 'instruction-text' },
+                                `Navigating: ${navigateFrom} → ${navigateTo}`,
+                                React.createElement('br'),
+                                isLiveNavigation ? 'Live walk mode active' : `Step ${currentStep + 1}/${activePath.instructions.length}`,
+                                React.createElement('br'),
+                                !isLiveNavigation && activePath.instructions[currentStep]
+                            ),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                !isLiveNavigation && React.createElement('button', {
+                                    onClick: nextStep,
+                                    className: 'btn-primary flex-1 text-sm'
+                                }, React.createElement(PlayIcon), ' Next Step'),
+                                React.createElement('button', {
+                                    onClick: () => {
+                                        if (isLiveNavigation) {
+                                            stopLiveNavigation();
+                                        }
+                                        stopNavigation();
+                                    },
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Stop Navigation')
+                            )
+                        )
+                    ),
+                    
+                    activePath && !isNavigating && React.createElement(LiveNavigationPanel, null)
+                );
+            };
+
+            // =============================================
+            // TRAIN PANEL
+            // =============================================
+            const TrainPanel = () => {
+                return React.createElement('div', { className: 'training-panel' },
+                    React.createElement('h3', null, 'Train New Path'),
+                    
+                    React.createElement('div', { className: 'mb-2' },
+                        React.createElement('input', {
+                            type: 'text',
+                            value: newPathName,
+                            onChange: (e) => setNewPathName(e.target.value),
+                            placeholder: 'Path Name (optional)',
+                            className: 'w-full mb-2'
+                        })
+                    ),
+                    
+                    React.createElement('div', { className: 'mb-2' },
+                        React.createElement(LocationDropdown, {
+                            value: trainingFrom,
+                            onChange: setTrainingFrom,
+                            placeholder: 'From location...'
+                        }),
+                        React.createElement(LocationDropdown, {
+                            value: trainingTo,
+                            onChange: setTrainingTo,
+                            placeholder: 'To location...'
+                        })
+                    ),
+                    
+                    currentPath.length > 0 && React.createElement('div', { className: 'train-stats' },
+                        React.createElement('div', { className: 'train-stats-row' },
+                            React.createElement('span', { className: 'train-stats-label' }, 'Path Points:'),
+                            React.createElement('span', { className: 'train-stats-value' }, currentPath.length)
+                        ),
+                        React.createElement('div', { className: 'train-stats-row' },
+                            React.createElement('span', { className: 'train-stats-label' }, 'Path Distance:'),
+                            React.createElement('span', { className: 'train-stats-value' }, `${calculatePathDistance(currentPath)}px`)
+                        ),
+                        React.createElement('div', { className: 'train-stats-row' },
+                            React.createElement('span', { className: 'train-stats-label' }, 'Instructions:'),
+                            React.createElement('span', { className: 'train-stats-value' }, pathInstructions.length)
+                        )
+                    ),
+                    
+                    React.createElement('div', { className: 'mb-2' },
+                        React.createElement('button', {
+                            onClick: startTraining,
+                            className: 'btn-warning w-full mb-2'
+                        }, 'Start Drawing Path'),
+                        
+                        currentPath.length > 0 && React.createElement('div', { className: 'flex gap-2' },
+                            React.createElement('button', {
+                                onClick: clearCurrentPath,
+                                className: 'btn-secondary flex-1 text-sm'
+                            }, 'Clear Path'),
+                            React.createElement('button', {
+                                onClick: saveTrainedPath,
+                                className: 'btn-success flex-1 text-sm'
+                            }, 'Save Path')
+                        )
+                    ),
+                    
+                    pathInstructions.length > 0 && React.createElement('div', { className: 'mb-2' },
+                        React.createElement('h4', { className: 'text-sm font-semibold mb-1' }, 'Path Instructions'),
+                        React.createElement('div', { className: 'scroll-container', style: { maxHeight: '150px' } },
+                            pathInstructions.map((instruction, idx) =>
+                                React.createElement('div', { key: idx, className: 'instruction-item' },
+                                    React.createElement('div', { className: 'instruction-number' }, idx + 1),
+                                    React.createElement('div', { className: 'instruction-content' },
+                                        React.createElement('span', null, instruction)
+                                    ),
+                                    React.createElement('div', { className: 'instruction-actions' },
+                                        React.createElement('button', {
+                                            onClick: () => editInstruction(idx, prompt('Edit instruction:', instruction) || instruction),
+                                            className: 'instruction-edit-btn'
+                                        }, 'Edit'),
+                                        React.createElement('button', {
+                                            onClick: () => deleteInstruction(idx),
+                                            className: 'instruction-delete-btn'
+                                        }, 'Delete')
+                                    )
+                                )
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'mt-2' },
+                            React.createElement('input', {
+                                type: 'text',
+                                value: currentInstruction,
+                                onChange: (e) => setCurrentInstruction(e.target.value),
+                                placeholder: 'Add custom instruction...',
+                                className: 'w-full mb-2',
+                                onKeyPress: (e) => e.key === 'Enter' && addInstructionToPath(currentInstruction)
+                            }),
+                            React.createElement('button', {
+                                onClick: () => addInstructionToPath(currentInstruction),
+                                className: 'btn-primary w-full py-1 text-sm'
+                            }, 'Add Instruction'),
+                            
+                            React.createElement('div', { className: 'mt-2' },
+                                React.createElement('p', { className: 'text-xs mb-1' }, 'Quick Instructions:'),
+                                React.createElement('div', { className: 'train-instructions-grid' },
+                                    trainingInstructions.map((instruction, idx) =>
+                                        React.createElement('button', {
+                                            key: idx,
+                                            onClick: () => addInstructionToPath(instruction),
+                                            className: 'btn-secondary text-xs py-1 px-2'
+                                        }, instruction)
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            };
+
+            // =============================================
+            // SCHOOL NAVIGATION HEADER COMPONENT
+            // =============================================
+            const SchoolNavigationHeader = () => {
+                return React.createElement('div', { className: 'school-header' },
+                    React.createElement('div', { className: 'school-title' },
+                        React.createElement('div', { className: 'school-icon' },
+                            React.createElement(SchoolIcon)
+                        ),
+                        React.createElement('div', null,
+                            React.createElement('div', null, 'School Navigation System'),
+                            React.createElement('div', { className: 'school-subtitle' }, 
+                                'Indoor Wayfinding with Live Walk Navigation'
+                            )
+                        ),
+                        React.createElement('div', { className: 'school-badge' },
+                            'School Edition'
+                        )
+                    )
+                );
+            };
+
+            // =============================================
+            // MAIN RENDER
+            // =============================================
+            
+            return React.createElement('div', { className: 'app' },
+                React.createElement('div', { className: 'sidebar' },
+                    // School Navigation Header
+                    React.createElement(SchoolNavigationHeader, null),
+                    
+                    React.createElement('div', { className: 'section' },
+                        !isAdmin ? (
+                            React.createElement('div', null,
+                                React.createElement('button', {
+                                    onClick: () => setShowLogin(true),
+                                    className: 'btn-warning w-full'
+                                }, React.createElement(LoginIcon), ' Admin Login'),
+                                showLogin && React.createElement('div', { className: 'login-panel' },
+                                    React.createElement('h3', null, 'Admin Login'),
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        value: username,
+                                        onChange: (e) => setUsername(e.target.value),
+                                        placeholder: 'Username',
+                                        className: 'w-full mb-2'
+                                    }),
+                                    React.createElement('input', {
+                                        type: 'password',
+                                        value: password,
+                                        onChange: (e) => setPassword(e.target.value),
+                                        placeholder: 'Password',
+                                        className: 'w-full mb-2',
+                                        onKeyPress: (e) => e.key === 'Enter' && handleLogin()
+                                    }),
+                                    React.createElement('div', { className: 'flex gap-2' },
+                                        React.createElement('button', {
+                                            onClick: handleLogin,
+                                            className: 'btn-success flex-1'
+                                        }, 'Login'),
+                                        React.createElement('button', {
+                                            onClick: () => setShowLogin(false),
+                                            className: 'btn-secondary flex-1'
+                                        }, 'Cancel')
+                                    )
+                                )
+                            )
+                        ) : (
+                            React.createElement('button', {
+                                onClick: handleLogout,
+                                className: 'btn-secondary w-full'
+                            }, React.createElement(LogoutIcon), ' Logout Admin')
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('button', {
+                            onClick: () => fileInputRef.current?.click(),
+                            className: 'btn-primary w-full'
+                        }, React.createElement(UploadIcon), ' Upload Floor Plan'),
+                        React.createElement('input', {
+                            ref: fileInputRef,
+                            type: 'file',
+                            accept: 'image/*',
+                            onChange: handleFileUpload,
+                            className: 'hidden'
+                        })
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('label', { className: 'text-sm' }, 'Mode:'),
+                        React.createElement('div', { className: 'mode-buttons' },
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('view'),
+                                className: `mode-btn ${mode === 'view' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'View'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('train'),
+                                className: `mode-btn train ${mode === 'train' ? 'active' : ''} ${!isAdmin ? 'disabled' : ''}`,
+                                disabled: !isAdmin
+                            }, 'Train'),
+                            React.createElement('button', {
+                                onClick: () => handleModeChange('navigate'),
+                                className: `mode-btn navigate ${mode === 'navigate' ? 'active' : ''}`
+                            }, 'Navigate')
+                        )
+                    ),
+
+                    mode === 'train' && isAdmin && React.createElement(TrainPanel, null),
+
+                    mode === 'navigate' && React.createElement(NavigationPanel, null),
+
+                    isAdmin && React.createElement('div', { className: 'section' },
+                        React.createElement('div', { className: 'flex justify-between items-center mb-2' },
+                            React.createElement('h2', null, 'Manage Locations'),
+                            !addingLocation && React.createElement('button', {
+                                onClick: startAddingLocation,
+                                className: 'btn-primary text-sm'
+                            }, '+ Add Location')
+                        ),
+                        
+                        addingLocation && React.createElement('div', { className: 'add-location-panel' },
+                            React.createElement('h3', { className: 'text-sm' }, 'Add New Location'),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: newLocationName,
+                                onChange: (e) => setNewLocationName(e.target.value),
+                                placeholder: 'Enter location name...',
+                                className: 'w-full mb-2',
+                                onKeyPress: (e) => e.key === 'Enter' && confirmAddLocation()
+                            }),
+                            React.createElement('p', { className: 'text-xs text-gray-600 mb-2' },
+                                pendingLocation ? '✓ Location marked on map' : 'Click on the map to place marker'
+                            ),
+                            React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('button', {
+                                    onClick: confirmAddLocation,
+                                    className: 'btn-success flex-1 text-sm'
+                                }, 'Save'),
+                                React.createElement('button', {
+                                    onClick: cancelAddLocation,
+                                    className: 'btn-secondary flex-1 text-sm'
+                                }, 'Cancel')
+                            )
+                        ),
+                        
+                        React.createElement('div', { className: 'scroll-container' },
+                            locations.length === 0 
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No locations added yet')
+                                : locations.map((loc, idx) =>
+                                    React.createElement('div', { key: idx, className: 'path-item' },
+                                        React.createElement('span', null, loc.name),
+                                        React.createElement('button', {
+                                            onClick: () => setLocations(locations.filter((_, i) => i !== idx)),
+                                            className: 'text-red-500'
+                                        }, React.createElement(TrashIcon))
+                                    )
+                                )
+                        )
+                    ),
+
+                    React.createElement('div', { className: 'section' },
+                        React.createElement('h2', null, `Saved Paths (${paths.length})`),
+                        React.createElement('div', { className: 'scroll-container' },
+                            paths.length === 0
+                                ? React.createElement('p', { className: 'text-gray-600 text-sm' }, 'No paths saved yet')
+                                : paths.map((path, idx) =>
+                                    React.createElement('div', { 
+                                        key: idx, 
+                                        className: `path-item ${selectedPathIndex === idx ? 'active' : ''}`,
+                                        onClick: () => {
+                                            setNavigateFrom(path.from);
+                                            setNavigateTo(path.to);
+                                            setSelectedPathIndex(idx);
+                                        }
+                                    },
+                                        React.createElement('div', null,
+                                            `${path.from} → ${path.to}`,
+                                            React.createElement('span', { className: 'text-xs text-gray-600' },
+                                                ` (${path.instructions.length} steps)`
+                                            )
+                                        )
+                                    )
+                                )
+                        )
+                    ),
+
+                    isAdmin && React.createElement(DataManagementPanel, null)
+                ),
+
+                React.createElement('div', { className: 'main-content' },
+                    floorPlan && React.createElement('div', { className: 'zoom-controls' },
+                        React.createElement('button', {
+                            onClick: zoomOut,
+                            className: 'zoom-btn',
+                            disabled: zoom <= 0.1
+                        }, React.createElement(ZoomOutIcon)),
+                        React.createElement('div', { className: 'zoom-level' }, `${Math.round(zoom * 100)}%`),
+                        React.createElement('button', {
+                            onClick: zoomIn,
+                            className: 'zoom-btn',
+                            disabled: zoom >= 5
+                        }, React.createElement(ZoomInIcon)),
+                        React.createElement('button', {
+                            onClick: resetZoom,
+                            className: 'zoom-btn'
+                        }, React.createElement(ResetZoomIcon))
+                    ),
+                    
+                    isLiveNavigation && React.createElement('div', { className: 'step-counter-overlay' },
+                        React.createElement('div', { className: 'step-counter-header' },
+                            React.createElement('div', { className: 'step-counter-title' }, 'Live Walk'),
+                            React.createElement('div', { className: 'step-counter-badge' }, 'ACTIVE')
+                        ),
+                        React.createElement('div', { className: 'step-counter-value' }, stepCount),
+                        React.createElement('div', { className: 'step-counter-label' }, 'Steps taken'),
+                        React.createElement('div', { className: 'step-counter-stats' },
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Distance'),
+                                React.createElement('div', { className: 'step-counter-stat-value' }, `${distanceMeters.toFixed(1)}m`)
+                            ),
+                            React.createElement('div', { className: 'step-counter-stat' },
+                                React.createElement('div', { className: 'step-counter-stat-label' }, 'Direction'),
+                                React.createElement('div', { className: 'step-counter-stat-value' }, currentDirection)
+                            )
+                        )
+                    ),
+                    
+                    floorPlan 
+                        ? React.createElement('div', { 
+                                className: 'canvas-container',
+                                onMouseDown: handleMouseDown,
+                                onMouseMove: handleMouseMove,
+                                onMouseUp: handleMouseUp,
+                                onMouseLeave: handleMouseUp
+                            },
+                            isLiveNavigation && React.createElement('div', {
+                                ref: positionMarkerRef,
+                                className: 'current-position-marker',
+                                title: `Your position (${currentPosition.x.toFixed(0)}, ${currentPosition.y.toFixed(0)})`
+                            }, 'YOU'),
+                            
+                            React.createElement('canvas', {
+                                ref: canvasRef,
+                                onClick: handleCanvasClick,
+                                className: 'cursor-grab'
+                            })
+                        ) 
+                        : React.createElement('div', { className: 'upload-area' },
+                            React.createElement('div', { style: { fontSize: '3rem', marginBottom: '1rem' } }, '📤'),
+                            React.createElement('p', { className: 'text-lg font-semibold mb-2' }, 'Upload a School Floor Plan'),
+                            React.createElement('p', { className: 'text-gray-600 mb-4' }, 'Supported formats: JPG, PNG, GIF, BMP'),
+                            React.createElement('button', {
+                                onClick: () => fileInputRef.current?.click(),
+                                className: 'btn-primary px-8 py-3 text-lg'
+                            }, 'Choose School Map')
+                        )
+                ),
+                
+                React.createElement(AutoSaveNotification, null)
+            );
+        };
+
+        ReactDOM.render(React.createElement(FloorPlanNavigator), document.getElementById('root'));
+    </script>
+</body>
+</html>
