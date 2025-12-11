@@ -155,8 +155,6 @@
             margin-top: 0.5rem;
         }
         
-        /* ... (rest of existing styles remain the same) ... */
-        
         .zoom-controls {
             position: absolute;
             top: 1rem;
@@ -1049,7 +1047,7 @@
             border: 2px solid #3b82f6;
             padding: 0.75rem 1.5rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            z-index: 100;
+            z-index: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -1281,6 +1279,155 @@
             color: white;
         }
         
+        /* NEW STYLES FOR NAVIGATION MARKER AND STEP CONTROLS */
+        .nav-progress-marker {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+            z-index: 99;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.5s ease-in-out;
+            animation: pulse-marker 2s infinite;
+        }
+        
+        @keyframes pulse-marker {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        
+        .step-arrival-indicator {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #10b981;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+            z-index: 97;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+        }
+        
+        .navigation-step-controls {
+            position: absolute;
+            bottom: 1px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 0.5rem;
+            border: 2px solid #3b82f6;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+            display: flex;
+            flex-direction: row;
+            gap: 0.75rem;
+            min-width: 280px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .step-nav-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .step-nav-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .step-nav-btn.primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .step-nav-btn.primary:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+        
+        .step-nav-btn.secondary {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .step-nav-btn.secondary:hover:not(:disabled) {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+        
+        .step-nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .step-progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            transition: width 0.5s ease;
+        }
+        
+        .step-progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .step-current-info {
+            font-size: 0.875rem;
+            color: #1f2937;
+            font-weight: 500;
+            text-align: center;
+            background: #f3f4f6;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
         .flex { display: flex; }
         .gap-2 { gap: 0.5rem; }
         .w-full { width: 100%; }
@@ -1345,6 +1492,8 @@
         const VoiceOffIcon = () => React.createElement('span', { className: 'icon' }, '🔇');
         const VolumeIcon = () => React.createElement('span', { className: 'icon' }, '🔉');
         const RepeatIcon = () => React.createElement('span', { className: 'icon' }, '🔁');
+        const PreviousIcon = () => React.createElement('span', { className: 'icon' }, '←');
+        const NextStepIcon = () => React.createElement('span', { className: 'icon' }, '→');
 
         const FloorPlanNavigator = () => {
             // LOADING STATES
@@ -1437,6 +1586,14 @@
             const [saveNotification, setSaveNotification] = useState('');
             const [jsonDataLoaded, setJsonDataLoaded] = useState(false);
             const [storageStatus, setStorageStatus] = useState('Checking storage...');
+            
+            // NEW STATE FOR NAVIGATION MARKER
+            const [navMarkerPosition, setNavMarkerPosition] = useState(null);
+            const [showNavMarker, setShowNavMarker] = useState(false);
+            const [progressLinePoints, setProgressLinePoints] = useState([]);
+            const [showStepArrival, setShowStepArrival] = useState(false);
+            const [arrivalPosition, setArrivalPosition] = useState(null);
+            const [showStepControls, setShowStepControls] = useState(false);
 
             const canvasRef = useRef(null);
             const fileInputRef = useRef(null);
@@ -1444,8 +1601,8 @@
             const importFileInputRef = useRef(null);
             const saveTimeoutRef = useRef(null);
             const speechSynthesisRef = useRef(null);
-            const animationFrameRef = useRef(null);
-            const animatingRef = useRef(false);
+            const navMarkerRef = useRef(null);
+            const stepArrivalRef = useRef(null);
 
             // =============================================
             // VOICE GUIDANCE FUNCTIONS
@@ -1833,27 +1990,32 @@
                         // Check for admin session
                         loadData();
                         
-                        // Detect device type and set up sensors
-                        detectDeviceType();
-                        if ('DeviceMotionEvent' in window) {
-                            setIsMotionAvailable(true);
-                        }
+                        // Show UI quickly, then initialize sensors in background
+                        setIsLoading(false);
+                        setLoadingMessage('Ready');
                         
-                        detectIOS();
-                        checkIOSPermissions();
-                        
-                        if (!detectIOS()) {
-                            startMotionTracking();
-                            startOrientationTracking();
-                            setSensorStatus('Motion sensors active');
-                        } else {
-                            setSensorStatus('iOS: Tap "Enable Motion & Orientation" (HTTPS required)');
-                        }
+                        // Initialize sensors and device detection in background
+                        setTimeout(() => {
+                            detectDeviceType();
+                            if ('DeviceMotionEvent' in window) {
+                                setIsMotionAvailable(true);
+                            }
+                            
+                            detectIOS();
+                            checkIOSPermissions();
+                            
+                            if (!detectIOS()) {
+                                startMotionTracking();
+                                startOrientationTracking();
+                                setSensorStatus('Motion sensors active');
+                            } else {
+                                setSensorStatus('iOS: Tap "Enable Motion & Orientation" (HTTPS required)');
+                            }
+                        }, 500);
                         
                     } catch (error) {
                         console.error('Initialization error:', error);
                         setLoadingError(`Initialization failed: ${error.message}`);
-                    } finally {
                         setIsLoading(false);
                         setLoadingMessage('Ready');
                         
@@ -1943,6 +2105,22 @@
                     autoSaveData();
                 }
             }, [floorPlan]);
+
+            useEffect(() => {
+                // Load and render floor plan when it changes
+                if (floorPlan) {
+                    // Use a small delay to ensure canvas is mounted
+                    const timer = setTimeout(() => {
+                        fitMapToScreen();
+                    }, 100);
+                    return () => clearTimeout(timer);
+                }
+            }, [floorPlan]);
+
+            useEffect(() => {
+                // Re-render canvas whenever zoom or offset changes
+                drawCanvas();
+            }, [zoom, offset, floorPlan]);
             
             useEffect(() => {
                 // Auto-save when mode changes (admin only)
@@ -2041,6 +2219,8 @@
                     setActivePath(null);
                     setIsNavigating(false);
                     setLastSaveTime(null);
+                    setShowNavMarker(false);
+                    setProgressLinePoints([]);
                     
                     // Clear localStorage
                     localStorage.removeItem(STORAGE_KEY);
@@ -2099,10 +2279,10 @@
                     const imageWidth = img.width;
                     const imageHeight = img.height;
                     
-                    // Calculate the zoom level to fit the image to the container
+                    // Calculate zoom to fit image to screen while maintaining aspect ratio
                     const scaleX = containerWidth / imageWidth;
                     const scaleY = containerHeight / imageHeight;
-                    const newZoom = Math.min(scaleX, scaleY) * 0.9; // 90% to add some padding
+                    const newZoom = Math.min(scaleX, scaleY);
                     
                     // Center the image
                     const newOffsetX = (containerWidth - (imageWidth * newZoom)) / 2;
@@ -2110,17 +2290,12 @@
                     
                     setZoom(newZoom);
                     setOffset({ x: newOffsetX, y: newOffsetY });
-                    
-                    // Hide panel when starting navigation (only in navigate mode)
-                    if (mode === 'navigate') {
-                        setIsPanelVisible(false);
-                    }
                 };
                 img.src = floorPlan;
             };
             
             // =============================================
-            // MODIFIED NAVIGATION FUNCTIONS WITH VOICE
+            // MODIFIED NAVIGATION FUNCTIONS WITH MOVING MARKER
             // =============================================
             
             const startNavigation = () => {
@@ -2145,73 +2320,76 @@
 
                 setActivePath(path);
                 setIsNavigating(true);
-                // navigationStarted indicates whether the user pressed the Start button
-                setNavigationStarted(false);
                 setCurrentStep(0);
-
-                // Set starting marker position to the first path point
-                if (path.path && path.path.length > 0) {
-                    setCurrentPosition({ x: path.path[0].x, y: path.path[0].y });
+                
+                // Initialize navigation marker at first path point
+                if (path.path.length > 0) {
+                    setNavMarkerPosition(path.path[0]);
+                    setShowNavMarker(true);
+                    
+                    // Initialize progress line with first point
+                    setProgressLinePoints([path.path[0]]);
                 }
-
+                
                 // Fit map to screen and hide panel
                 fitMapToScreen();
+                setIsPanelVisible(false);
 
-                drawCanvas();
-
-                // Ensure voice is initialized and speak immediately on user click
-                if (isVoiceEnabled && autoSpeak) {
-                    if (!voiceSupported) {
-                        initializeVoice();
+                // Center view on the START (from) point so the marker/cursor appears there
+                if (path.path && path.path.length > 0 && canvasRef.current) {
+                    const start = path.path[0];
+                    const canvas = canvasRef.current;
+                    const container = canvas.parentElement;
+                    if (container) {
+                        const containerWidth = container.clientWidth;
+                        const containerHeight = container.clientHeight;
+                        const newOffsetX = (containerWidth / 2) - (start.x * zoom);
+                        const newOffsetY = (containerHeight / 2) - (start.y * zoom);
+                        setOffset({ x: newOffsetX, y: newOffsetY });
                     }
+                }
 
-                    const welcomed = speakWelcomeMessage();
-                    // If welcome was successfully queued, play first instruction shortly after
-                    if (welcomed) {
+                // Require user to press overlay 'Start' before stepping
+                setNavigationStarted(false);
+                
+                drawCanvas();
+                
+                // Speak welcome message and first instruction
+                if (isVoiceEnabled && autoSpeak) {
+                    setTimeout(() => {
+                        speakWelcomeMessage();
                         setTimeout(() => {
                             speakNavigationStep();
-                        }, 800);
-                    } else {
-                        // If speaking failed, fallback to speaking the first instruction
-                        speakNavigationStep();
-                    }
+                        }, 2000);
+                    }, 500);
                 }
-
+                
                 alert(`Navigation started from "${navigateFrom}" to "${navigateTo}"! Follow the voice instructions.`);
-            };
-            
-            const stopNavigation = () => {
-                stopSpeaking();
-                setIsNavigating(false);
-                setIsLiveNavigation(false);
-                setActivePath(null);
-                setCurrentStep(0);
-                // Reset navigationStarted and show panel again when stopping navigation
-                setNavigationStarted(false);
-                // Cancel any running marker animation
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                    animationFrameRef.current = null;
-                    animatingRef.current = false;
-                }
-                setIsPanelVisible(true);
-                setIsFullscreenMode(false);
             };
 
             const beginNavigationSteps = () => {
-                // Ensure any running animation is canceled and marker is at START
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                    animationFrameRef.current = null;
-                    animatingRef.current = false;
-                }
+                if (!activePath) return;
 
-                if (activePath && activePath.path && activePath.path.length > 0) {
-                    // Position marker exactly at start point
+                // Ensure marker is at start and step index at 0
+                if (activePath.path && activePath.path.length > 0) {
                     const start = activePath.path[0];
-                    setCurrentPosition({ x: start.x, y: start.y });
-                    // Ensure step index is at 0
+                    setNavMarkerPosition(start);
+                    setProgressLinePoints([start]);
                     setCurrentStep(0);
+                    setShowNavMarker(true);
+
+                    // Center view on the START point as well
+                    if (canvasRef.current) {
+                        const canvas = canvasRef.current;
+                        const container = canvas.parentElement;
+                        if (container) {
+                            const containerWidth = container.clientWidth;
+                            const containerHeight = container.clientHeight;
+                            const newOffX = (containerWidth / 2) - (start.x * zoom);
+                            const newOffY = (containerHeight / 2) - (start.y * zoom);
+                            setOffset({ x: newOffX, y: newOffY });
+                        }
+                    }
                 }
 
                 setNavigationStarted(true);
@@ -2221,40 +2399,112 @@
                     speakNavigationStep();
                 }
             };
+            
+            const stopNavigation = () => {
+                stopSpeaking();
+                setIsNavigating(false);
+                setIsLiveNavigation(false);
+                setActivePath(null);
+                setCurrentStep(0);
+                setShowNavMarker(false);
+                setProgressLinePoints([]);
+                setShowStepArrival(false);
+                
+                // Show panel again when stopping navigation
+                setIsPanelVisible(true);
+                setIsFullscreenMode(false);
+            };
 
-            const nextStep = async () => {
+            const nextStep = () => {
                 if (!activePath || !isNavigating) return;
-
+                
                 const nextIdx = currentStep + 1;
                 if (nextIdx < activePath.instructions.length) {
-                    // If a path point exists, animate marker to it first
-                    if (activePath.path && activePath.path[nextIdx]) {
-                        try {
-                            // animate following the polyline between currentStep and nextIdx
-                            await animateAlongPathToIndex(currentStep, nextIdx, 600);
-                        } catch (e) {
-                            // fallback to immediate set
-                            setCurrentPosition({ x: activePath.path[nextIdx].x, y: activePath.path[nextIdx].y });
-                        }
-                    }
-
-                    // Reveal and select the next step after the movement
                     setCurrentStep(nextIdx);
-
+                    
+                    // Move navigation marker to the corresponding path point
+                    moveMarkerToStep(nextIdx);
+                    
                     // Speak the next instruction
                     if (isVoiceEnabled && autoSpeak) {
                         speakNavigationStep();
                     }
                 } else {
-                    // Navigation completed
+                    // Navigation completed - move marker to final position
+                    if (activePath.path.length > 0) {
+                        setNavMarkerPosition(activePath.path[activePath.path.length - 1]);
+                        setShowStepArrival(true);
+                        setArrivalPosition(activePath.path[activePath.path.length - 1]);
+                    }
+                    
                     if (isVoiceEnabled && autoSpeak) {
                         speakCompletionMessage();
                     }
-
+                    
                     setTimeout(() => {
                         alert(`Congratulations! You have reached your destination: ${activePath.to}`);
                         stopNavigation();
                     }, 1000);
+                }
+            };
+            
+            const previousStep = () => {
+                if (!activePath || !isNavigating || currentStep === 0) return;
+                
+                const prevIdx = currentStep - 1;
+                setCurrentStep(prevIdx);
+                
+                // Move navigation marker back to previous path point
+                moveMarkerToStep(prevIdx);
+                
+                // Speak the previous instruction
+                if (isVoiceEnabled && autoSpeak) {
+                    speakNavigationStep();
+                }
+            };
+            
+            const moveMarkerToStep = (stepIndex) => {
+                if (!activePath || !activePath.path) return;
+                
+                // Calculate which path point corresponds to this step
+                const totalSteps = activePath.instructions.length;
+                const totalPoints = activePath.path.length;
+                
+                // Map step index to path point index
+                const pointIndex = Math.floor((stepIndex / totalSteps) * totalPoints);
+                const clampedIndex = Math.min(Math.max(pointIndex, 0), totalPoints - 1);
+                
+                const targetPoint = activePath.path[clampedIndex];
+                if (targetPoint) {
+                    setNavMarkerPosition(targetPoint);
+                    
+                    // Update progress line
+                    const newProgressPoints = activePath.path.slice(0, clampedIndex + 1);
+                    setProgressLinePoints(newProgressPoints);
+                    
+                    // Show arrival animation at the point
+                    setShowStepArrival(true);
+                    setArrivalPosition(targetPoint);
+                    
+                    // Hide arrival animation after 1 second
+                    setTimeout(() => {
+                        setShowStepArrival(false);
+                    }, 1000);
+                }
+            };
+            
+            const jumpToStep = (stepNumber) => {
+                if (!activePath || !isNavigating || stepNumber < 1 || stepNumber > activePath.instructions.length) {
+                    return;
+                }
+                
+                const stepIndex = stepNumber - 1;
+                setCurrentStep(stepIndex);
+                moveMarkerToStep(stepIndex);
+                
+                // Speak the instruction for this step
+                if (isVoiceEnabled && autoSpeak) {
+                    speakNavigationStep();
                 }
             };
 
@@ -2423,137 +2673,6 @@
                 if (isVoiceEnabled && autoSpeak && stepCount % 10 === 0) {
                     speak(`Step ${stepCount + 1}. Distance traveled: ${distanceMeters.toFixed(1)} meters.`);
                 }
-            };
-
-            // Smoothly animate the marker to a target (x,y) over `duration` ms.
-            const animateMarkerTo = (targetX, targetY, duration = 600) => {
-                return new Promise((resolve) => {
-                    // Cancel any existing animation
-                    if (animationFrameRef.current) {
-                        cancelAnimationFrame(animationFrameRef.current);
-                        animationFrameRef.current = null;
-                    }
-
-                    const startX = currentPosition.x;
-                    const startY = currentPosition.y;
-                    const deltaX = targetX - startX;
-                    const deltaY = targetY - startY;
-                    const startTime = performance.now();
-                    animatingRef.current = true;
-
-                    const easeInOutQuad = (t) => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
-
-                    const step = (now) => {
-                        const elapsed = now - startTime;
-                        const t = Math.min(1, elapsed / duration);
-                        const eased = easeInOutQuad(t);
-
-                        const curX = startX + deltaX * eased;
-                        const curY = startY + deltaY * eased;
-                        setCurrentPosition({ x: curX, y: curY });
-
-                        if (t < 1) {
-                            animationFrameRef.current = requestAnimationFrame(step);
-                        } else {
-                            animatingRef.current = false;
-                            animationFrameRef.current = null;
-                            // ensure final position exact
-                            setCurrentPosition({ x: targetX, y: targetY });
-                            resolve();
-                        }
-                    };
-
-                    animationFrameRef.current = requestAnimationFrame(step);
-                });
-            };
-
-            // Animate the marker following the activePath polyline from currentStep to targetIndex
-            const animateAlongPathToIndex = (fromIndex, toIndex, duration = 700) => {
-                return new Promise((resolve) => {
-                    if (!activePath || !activePath.path || fromIndex < 0 || toIndex <= fromIndex) {
-                        resolve();
-                        return;
-                    }
-
-                    // Build a flat list of points representing the route between the two indices
-                    const pts = [];
-                    for (let i = fromIndex; i <= toIndex; i++) {
-                        const p = activePath.path[i];
-                        if (p) pts.push({ x: p.x, y: p.y });
-                    }
-
-                    if (pts.length < 2) {
-                        resolve();
-                        return;
-                    }
-
-                    // Compute cumulative distances
-                    const segLengths = [];
-                    let totalDist = 0;
-                    for (let i = 1; i < pts.length; i++) {
-                        const dx = pts[i].x - pts[i-1].x;
-                        const dy = pts[i].y - pts[i-1].y;
-                        const d = Math.sqrt(dx*dx + dy*dy);
-                        segLengths.push(d);
-                        totalDist += d;
-                    }
-
-                    if (totalDist === 0) {
-                        resolve();
-                        return;
-                    }
-
-                    // Cancel existing animation
-                    if (animationFrameRef.current) {
-                        cancelAnimationFrame(animationFrameRef.current);
-                        animationFrameRef.current = null;
-                    }
-
-                    const startTime = performance.now();
-                    animatingRef.current = true;
-
-                    const ease = (t) => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
-
-                    const step = (now) => {
-                        const elapsed = now - startTime;
-                        const t = Math.min(1, elapsed / duration);
-                        const eased = ease(t);
-
-                        // position along total distance
-                        const distAlong = eased * totalDist;
-
-                        // find which segment we're in
-                        let acc = 0;
-                        let segIndex = 0;
-                        while (segIndex < segLengths.length && acc + segLengths[segIndex] < distAlong) {
-                            acc += segLengths[segIndex];
-                            segIndex++;
-                        }
-
-                        const segStart = pts[segIndex];
-                        const segEnd = pts[segIndex + 1] || segStart;
-                        const segDist = segLengths[segIndex] || 0.0001;
-                        const segT = Math.min(1, (distAlong - acc) / segDist);
-
-                        const curX = segStart.x + (segEnd.x - segStart.x) * segT;
-                        const curY = segStart.y + (segEnd.y - segStart.y) * segT;
-
-                        setCurrentPosition({ x: curX, y: curY });
-
-                        if (t < 1) {
-                            animationFrameRef.current = requestAnimationFrame(step);
-                        } else {
-                            animatingRef.current = false;
-                            animationFrameRef.current = null;
-                            // ensure final position exact on last point
-                            const last = pts[pts.length - 1];
-                            setCurrentPosition({ x: last.x, y: last.y });
-                            resolve();
-                        }
-                    };
-
-                    animationFrameRef.current = requestAnimationFrame(step);
-                });
             };
             
             const updatePathProgress = (x, y) => {
@@ -2729,61 +2848,9 @@
             };
 
             // =============================================
-            // EXISTING FUNCTIONS
+            // MODIFIED DRAW FUNCTION TO SHOW NAVIGATION PROGRESS
             // =============================================
             
-            const detectDeviceType = () => {
-                const userAgent = navigator.userAgent.toLowerCase();
-                const isMobile = /mobile|iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(userAgent);
-                const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
-                
-                if (isMobile && !isTablet) {
-                    setDeviceType('mobile');
-                } else if (isTablet) {
-                    setDeviceType('tablet');
-                } else {
-                    setDeviceType('desktop');
-                }
-            };
-
-            const handleLogin = () => {
-                const ADMIN_CREDENTIALS = {
-                    username: 'admin',
-                    password: 'admin123'
-                };
-                
-                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-                    setIsAdmin(true);
-                    setShowLogin(false);
-                    setUsername('');
-                    setPassword('');
-                    localStorage.setItem('nav-admin', 'true');
-                    alert('Admin login successful!');
-                } else {
-                    alert('Invalid credentials');
-                }
-            };
-
-            const handleLogout = () => {
-                setIsAdmin(false);
-                setMode('navigate');
-                localStorage.removeItem('nav-admin');
-                alert('Logged out successfully');
-            };
-
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        setFloorPlan(event.target.result);
-                        setZoom(1);
-                        setOffset({ x: 0, y: 0 });
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-
             const drawCanvas = () => {
                 const canvas = canvasRef.current;
                 if (!canvas || !floorPlan) return;
@@ -2869,76 +2936,71 @@
                         }
                     }
 
-                    if ((isNavigating || isLiveNavigation) && activePath && activePath.path && activePath.path.length > 0) {
-                        // Show only revealed steps when navigating; otherwise show full path
-                        const totalPoints = activePath.path.length;
-                        const visibleCount = (isNavigating) ? Math.min(currentStep + 1, totalPoints) : totalPoints;
+                    // DRAW NAVIGATION PROGRESS LINE
+                    if (isNavigating && progressLinePoints.length > 1) {
+                        ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)';
+                        ctx.lineWidth = 6 * zoom;
+                        ctx.lineJoin = 'round';
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        
+                        ctx.moveTo(progressLinePoints[0].x * zoom, progressLinePoints[0].y * zoom);
+                        for (let i = 1; i < progressLinePoints.length; i++) {
+                            ctx.lineTo(progressLinePoints[i].x * zoom, progressLinePoints[i].y * zoom);
+                        }
+                        ctx.stroke();
+                        
+                        // Draw gradient effect
+                        ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+                        ctx.lineWidth = 3 * zoom;
+                        ctx.beginPath();
+                        ctx.moveTo(progressLinePoints[0].x * zoom, progressLinePoints[0].y * zoom);
+                        for (let i = 1; i < progressLinePoints.length; i++) {
+                            ctx.lineTo(progressLinePoints[i].x * zoom, progressLinePoints[i].y * zoom);
+                        }
+                        ctx.stroke();
+                    }
 
-                        // Draw polyline only through visible points
+                    if (activePath && activePath.path && activePath.path.length > 0) {
                         ctx.strokeStyle = '#ef4444';
                         ctx.lineWidth = 4 * zoom;
                         ctx.lineJoin = 'round';
                         ctx.lineCap = 'round';
                         ctx.beginPath();
-
-                        if (activePath.path[0] && visibleCount > 0) {
+                        
+                        if (activePath.path[0]) {
                             ctx.moveTo(activePath.path[0].x * zoom, activePath.path[0].y * zoom);
                         }
-
-                        for (let i = 1; i < visibleCount; i++) {
-                            const p = activePath.path[i];
-                            if (p) ctx.lineTo(p.x * zoom, p.y * zoom);
+                        
+                        for (let i = 1; i < activePath.path.length; i++) {
+                            if (activePath.path[i]) {
+                                ctx.lineTo(activePath.path[i].x * zoom, activePath.path[i].y * zoom);
+                            }
                         }
                         ctx.stroke();
-
-                        // Draw markers: visible steps highlighted, future steps faded
+                        
                         activePath.path.forEach((point, index) => {
-                            if (!point) return;
-
-                            if (isNavigating && index === currentStep) {
-                                // Current step marker
-                                ctx.fillStyle = '#f59e0b';
-                                ctx.beginPath();
-                                ctx.arc(point.x * zoom, point.y * zoom, 10 * zoom, 0, 2 * Math.PI);
-                                ctx.fill();
-                                ctx.strokeStyle = '#fff';
-                                ctx.lineWidth = 2 * zoom;
-                                ctx.stroke();
-
-                                ctx.fillStyle = '#000';
-                                ctx.font = `bold ${12 * zoom}px Arial`;
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                ctx.fillText(`${index + 1}`, point.x * zoom, point.y * zoom);
-                            } else if (index < visibleCount) {
-                                // Revealed step
+                            if (point) {
                                 ctx.fillStyle = '#ef4444';
                                 ctx.beginPath();
-                                ctx.arc(point.x * zoom, point.y * zoom, 7 * zoom, 0, 2 * Math.PI);
+                                ctx.arc(point.x * zoom, point.y * zoom, 6 * zoom, 0, 2 * Math.PI);
                                 ctx.fill();
                                 ctx.strokeStyle = '#fff';
                                 ctx.lineWidth = 2 * zoom;
                                 ctx.stroke();
-
+                                
                                 ctx.fillStyle = '#fff';
                                 ctx.font = `bold ${10 * zoom}px Arial`;
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = 'middle';
                                 ctx.fillText(`${index + 1}`, point.x * zoom, point.y * zoom);
-                            } else {
-                                // Future (hidden) step - draw small faded dot so user can see upcoming layout if desired
-                                ctx.fillStyle = 'rgba(156,163,175,0.5)';
-                                ctx.beginPath();
-                                ctx.arc(point.x * zoom, point.y * zoom, 4 * zoom, 0, 2 * Math.PI);
-                                ctx.fill();
                             }
                         });
-
-                        // Draw START/END over the known from/to locations
+                        
                         if (activePath.from && activePath.to) {
                             const fromLoc = locations.find(l => l.name === activePath.from);
                             const toLoc = locations.find(l => l.name === activePath.to);
-
+                            
                             if (fromLoc) {
                                 ctx.fillStyle = '#10b981';
                                 ctx.beginPath();
@@ -2947,14 +3009,14 @@
                                 ctx.strokeStyle = '#fff';
                                 ctx.lineWidth = 3 * zoom;
                                 ctx.stroke();
-
+                                
                                 ctx.fillStyle = '#fff';
                                 ctx.font = `bold ${12 * zoom}px Arial`;
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = 'middle';
                                 ctx.fillText('START', fromLoc.x * zoom, fromLoc.y * zoom);
                             }
-
+                            
                             if (toLoc) {
                                 ctx.fillStyle = '#ef4444';
                                 ctx.beginPath();
@@ -2963,7 +3025,7 @@
                                 ctx.strokeStyle = '#fff';
                                 ctx.lineWidth = 3 * zoom;
                                 ctx.stroke();
-
+                                
                                 ctx.fillStyle = '#fff';
                                 ctx.font = `bold ${12 * zoom}px Arial`;
                                 ctx.textAlign = 'center';
@@ -2980,7 +3042,39 @@
 
             useEffect(() => {
                 drawCanvas();
-            }, [floorPlan, locations, currentPath, activePath, zoom, offset, pendingLocation, trainingFrom, trainingTo, currentStep, isNavigating]);
+            }, [floorPlan, locations, currentPath, activePath, zoom, offset, pendingLocation, trainingFrom, trainingTo, progressLinePoints]);
+
+            // =============================================
+            // EFFECT TO UPDATE MARKER POSITION ON CANVAS
+            // =============================================
+            
+            useEffect(() => {
+                if (navMarkerRef.current && floorPlan && showNavMarker && navMarkerPosition) {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    const x = navMarkerPosition.x * zoom + offset.x;
+                    const y = navMarkerPosition.y * zoom + offset.y;
+                    
+                    navMarkerRef.current.style.left = `${rect.left + x}px`;
+                    navMarkerRef.current.style.top = `${rect.top + y}px`;
+                }
+            }, [navMarkerPosition, zoom, offset, floorPlan, showNavMarker]);
+
+            useEffect(() => {
+                if (stepArrivalRef.current && floorPlan && showStepArrival && arrivalPosition) {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    
+                    const rect = canvas.getBoundingClientRect();
+                    const x = arrivalPosition.x * zoom + offset.x;
+                    const y = arrivalPosition.y * zoom + offset.y;
+                    
+                    stepArrivalRef.current.style.left = `${rect.left + x}px`;
+                    stepArrivalRef.current.style.top = `${rect.top + y}px`;
+                }
+            }, [arrivalPosition, zoom, offset, floorPlan, showStepArrival]);
 
             const handleCanvasClick = (e) => {
                 if (!canvasRef.current) return;
@@ -3195,19 +3289,149 @@
             };
 
             useEffect(() => {
-                if (positionMarkerRef.current && floorPlan && (isLiveNavigation || isNavigating)) {
+                if (positionMarkerRef.current && floorPlan && isLiveNavigation) {
                     const canvas = canvasRef.current;
                     if (!canvas) return;
-
+                    
                     const rect = canvas.getBoundingClientRect();
                     const x = currentPosition.x * zoom + offset.x;
                     const y = currentPosition.y * zoom + offset.y;
-
-                    // Position the marker relative to the canvas container
+                    
                     positionMarkerRef.current.style.left = `${rect.left + x}px`;
                     positionMarkerRef.current.style.top = `${rect.top + y}px`;
                 }
-            }, [currentPosition, zoom, offset, floorPlan, isLiveNavigation, isNavigating]);
+            }, [currentPosition, zoom, offset, floorPlan, isLiveNavigation]);
+
+            const detectDeviceType = () => {
+                const userAgent = navigator.userAgent.toLowerCase();
+                const isMobile = /mobile|iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(userAgent);
+                const isTablet = /tablet|ipad|playbook|silk/i.test(userAgent);
+                
+                if (isMobile && !isTablet) {
+                    setDeviceType('mobile');
+                } else if (isTablet) {
+                    setDeviceType('tablet');
+                } else {
+                    setDeviceType('desktop');
+                }
+            };
+
+            const handleLogin = () => {
+                const ADMIN_CREDENTIALS = {
+                    username: 'admin',
+                    password: 'admin123'
+                };
+                
+                if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPassword('');
+                    localStorage.setItem('nav-admin', 'true');
+                    alert('Admin login successful!');
+                } else {
+                    alert('Invalid credentials');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsAdmin(false);
+                setMode('navigate');
+                localStorage.removeItem('nav-admin');
+                alert('Logged out successfully');
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setFloorPlan(event.target.result);
+                        setZoom(1);
+                        setOffset({ x: 0, y: 0 });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            // =============================================
+            // STEP NAVIGATION CONTROLS COMPONENT
+            // =============================================
+            const StepNavigationControls = () => {
+                if (!isNavigating) return null;
+                
+                const totalSteps = activePath?.instructions?.length || 0;
+                const progressPercentage = totalSteps > 0 ? ((currentStep + 1) / totalSteps) * 100 : 0;
+                
+                return React.createElement('div', { className: 'navigation-step-controls' },
+                    React.createElement('div', { className: 'step-progress-bar' },
+                        React.createElement('div', { 
+                            className: 'step-progress-fill',
+                            style: { width: `${progressPercentage}%` }
+                        })
+                    ),
+                    
+                    React.createElement('div', { className: 'step-nav-buttons' },
+                        !navigationStarted && React.createElement('button', {
+                            className: 'step-nav-btn primary',
+                            onClick: beginNavigationSteps
+                        },
+                            React.createElement(PlayIcon),
+                            'Start'
+                        ),
+                        
+                        navigationStarted && React.createElement('button', {
+                            className: 'step-nav-btn primary',
+                            onClick: previousStep,
+                            disabled: currentStep === 0
+                        },
+                            React.createElement(PreviousIcon),
+                            'Previous'
+                        ),
+                        
+                        navigationStarted && React.createElement('button', {
+                            className: 'step-nav-btn primary',
+                            onClick: nextStep,
+                            disabled: currentStep >= totalSteps - 1
+                        },
+                            'Next',
+                            React.createElement(NextStepIcon)
+                        )
+                    ),
+                    
+                    totalSteps > 5 && React.createElement('div', null,
+                        React.createElement('div', { 
+                            className: 'text-xs text-gray-600 mb-1 text-center' 
+                        }, 'Quick Jump:'),
+                        React.createElement('div', { 
+                            className: 'flex flex-wrap gap-1 justify-center' 
+                        },
+                            [1, Math.floor(totalSteps/4), Math.floor(totalSteps/2), Math.floor(3*totalSteps/4), totalSteps]
+                                .filter((step, idx, arr) => arr.indexOf(step) === idx)
+                                .map(step => 
+                                    React.createElement('button', {
+                                        key: step,
+                                        className: `px-2 py-1 text-xs rounded ${
+                                            currentStep + 1 === step 
+                                                ? 'bg-blue-500 text-white' 
+                                                : 'bg-gray-200 text-gray-700'
+                                        }`,
+                                        onClick: () => jumpToStep(step),
+                                        disabled: step > totalSteps
+                                    }, `Step ${step}`)
+                                )
+                        )
+                    ),
+                    
+                    React.createElement('button', {
+                        className: 'step-nav-btn secondary',
+                        onClick: stopNavigation
+                    },
+                        React.createElement(StopIcon),
+                        'Stop Navigation'
+                    )
+                );
+            };
 
             // =============================================
             // AUTO-SAVE NOTIFICATION COMPONENT
@@ -3320,7 +3544,7 @@
                                     value: voiceVolume,
                                     onChange: (e) => setVoiceVolume(parseFloat(e.target.value)),
                                     disabled: !isVoiceEnabled,
-                                    style: { width: '80px' }
+                                    style: { width: '50px' }
                                 })
                             ),
                             React.createElement('label', { 
@@ -3336,7 +3560,7 @@
                                     value: voiceRate,
                                     onChange: (e) => setVoiceRate(parseFloat(e.target.value)),
                                     disabled: !isVoiceEnabled,
-                                    style: { width: '80px' }
+                                    style: { width: '50px' }
                                 })
                             )
                         ),
@@ -3416,7 +3640,7 @@
                         )
                     ),
                     
-                    React.createElement('div', { className: 'navigation-buttons' },
+                    showStepControls && React.createElement('div', { className: 'navigation-buttons' },
                         !isLiveNavigation && (
                             !navigationStarted ? React.createElement('button', {
                                 className: 'nav-control-bottom primary',
@@ -3424,7 +3648,7 @@
                                 disabled: currentStep >= totalSteps - 1
                             },
                                 React.createElement(PlayIcon),
-                                'Start'
+                                ' Start'
                             ) : React.createElement('button', {
                                 className: 'nav-control-bottom primary',
                                 onClick: nextStep,
@@ -3434,7 +3658,6 @@
                                 'Next Step'
                             )
                         ),
-
                         React.createElement('button', {
                             className: 'nav-control-bottom secondary',
                             onClick: stopNavigation
@@ -3970,14 +4193,10 @@
                             React.createElement(SchoolIcon)
                         ),
                         React.createElement('div', null,
-                            React.createElement('div', null, 'Emmaus School Navigation System'),
-                            React.createElement('div', { className: 'school-subtitle' }, 
-                                'Indoor Wayfinding with Live Walk Navigation'
-                            )
-                        ),
-                        React.createElement('div', { className: 'school-badge' },
-                            'School Edition'
+                            React.createElement('div', null, 'Emmaus High School Navigation System')
+                           
                         )
+                        
                     )
                 );
             };
@@ -4043,7 +4262,7 @@
                             )
                         ),
 
-                        React.createElement('div', { className: 'section' },
+                        isAdmin && React.createElement('div', { className: 'section' },
                             React.createElement('button', {
                                 onClick: () => fileInputRef.current?.click(),
                                 className: 'btn-primary w-full'
@@ -4057,12 +4276,7 @@
                             })
                         ),
 
-                        // Voice Control Panel
-                        React.createElement('div', { className: 'section' },
-                            React.createElement(VoiceControlPanel, null)
-                        ),
-
-                        React.createElement('div', { className: 'section' },
+                        isAdmin && React.createElement('div', { className: 'section' },
                             React.createElement('label', { className: 'text-sm' }, 'Mode:'),
                             React.createElement('div', { className: 'mode-buttons' },
                                 React.createElement('button', {
@@ -4085,6 +4299,11 @@
                         mode === 'train' && isAdmin && React.createElement(TrainPanel, null),
 
                         mode === 'navigate' && React.createElement(NavigationPanel, null),
+
+                        // Voice Control Panel - below navigation menu
+                        React.createElement('div', { className: 'section' },
+                            React.createElement(VoiceControlPanel, null)
+                        ),
 
                         isAdmin && React.createElement('div', { className: 'section' },
                             React.createElement('div', { className: 'flex justify-between items-center mb-2' },
@@ -4135,7 +4354,7 @@
                             )
                         ),
 
-                        React.createElement('div', { className: 'section' },
+                        isAdmin && React.createElement('div', { className: 'section' },
                             React.createElement('h2', null, `Saved Paths (${paths.length})`),
                             React.createElement('div', { className: 'scroll-container' },
                                 paths.length === 0
@@ -4188,7 +4407,23 @@
                             }, React.createElement(ResetZoomIcon))
                         ),
                         
-                        // Navigation Controls Overlay (shown during navigation)
+                        // Navigation Marker (blue dot that moves)
+                        showNavMarker && React.createElement('div', {
+                            ref: navMarkerRef,
+                            className: 'nav-progress-marker',
+                            title: `Navigation Progress (Step ${currentStep + 1})`
+                        }, '📍'),
+                        
+                        // Step Arrival Indicator (green dot that appears briefly)
+                        showStepArrival && React.createElement('div', {
+                            ref: stepArrivalRef,
+                            className: 'step-arrival-indicator'
+                        }, '✓'),
+                        
+                        // Step Navigation Controls
+                        React.createElement(StepNavigationControls, null),
+                        
+                        // Navigation Controls Overlay
                         React.createElement(NavigationControlsOverlay, null),
                         
                         isLiveNavigation && React.createElement('div', { className: 'step-counter-overlay' },
@@ -4218,11 +4453,11 @@
                                     onMouseUp: handleMouseUp,
                                     onMouseLeave: handleMouseUp
                                 },
-                                (isLiveNavigation || isNavigating) && React.createElement('div', {
-                                            ref: positionMarkerRef,
-                                            className: 'current-position-marker',
-                                            title: `Your position (${currentPosition.x.toFixed(0)}, ${currentPosition.y.toFixed(0)})`
-                                        }, isLiveNavigation ? '🚶' : '🧍'),
+                                isLiveNavigation && React.createElement('div', {
+                                    ref: positionMarkerRef,
+                                    className: 'current-position-marker',
+                                    title: `Your position (${currentPosition.x.toFixed(0)}, ${currentPosition.y.toFixed(0)})`
+                                }, 'YOU'),
                                 
                                 React.createElement('canvas', {
                                     ref: canvasRef,
