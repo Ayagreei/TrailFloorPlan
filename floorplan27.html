@@ -820,6 +820,40 @@
             font-size: 10px;
             font-weight: bold;
         }
+
+        /* Live-walk bottom bar (appears over map when live walk active) */
+        .live-walk-bottom-bar {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            width: calc(100% - 2rem);
+            max-width: 900px;
+            z-index: 220;
+            box-shadow: 0 6px 18px rgba(15,23,42,0.12);
+        }
+
+        .live-walk-stats {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .live-walk-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
         
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
@@ -837,7 +871,7 @@
             border: 2px solid #3b82f6;
             padding: 0.75rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            z-index: 100;
+            z-index: 0;
             min-width: 200px;
         }
         
@@ -2331,9 +2365,10 @@
                     setProgressLinePoints([path.path[0]]);
                 }
                 
-                // Fit map to screen and hide panel
+                // Fit map to screen, collapse sidebar and expand map view
                 fitMapToScreen();
                 setIsPanelVisible(false);
+                setIsFullscreenMode(true);
 
                 // Center view on the START (from) point so the marker/cursor appears there
                 if (path.path && path.path.length > 0 && canvasRef.current) {
@@ -2600,6 +2635,9 @@
                 }
                 
                 setIsLiveNavigation(true);
+                // Collapse sidebar and expand map for live walk
+                setIsPanelVisible(false);
+                setIsFullscreenMode(true);
                 setStepCount(0);
                 setDistanceMeters(0);
                 setCurrentPosition({ x: activePath.path[0].x, y: activePath.path[0].y });
@@ -4463,7 +4501,21 @@
                                     ref: canvasRef,
                                     onClick: handleCanvasClick,
                                     className: 'cursor-grab'
-                                })
+                                }),
+
+                                // Live-walk bottom bar overlay
+                                isLiveNavigation && React.createElement('div', { className: 'live-walk-bottom-bar' },
+                                    React.createElement('div', { className: 'live-walk-stats' },
+                                        React.createElement('div', null, `${stepCount} steps`),
+                                        React.createElement('div', null, `${distanceMeters.toFixed(1)}m`),
+                                        React.createElement('div', null, currentDirection)
+                                    ),
+                                    React.createElement('div', { className: 'live-walk-actions' },
+                                        React.createElement('button', { className: 'walk-action-btn danger', onClick: stopLiveNavigation }, 'Stop'),
+                                        React.createElement('button', { className: 'walk-action-btn secondary', onClick: () => { if (isMotionTracking) { stopMotionTracking(); setIsMotionTracking(false); } else { startMotionTracking(); setIsMotionTracking(true); } } }, isMotionTracking ? 'Pause' : 'Resume'),
+                                        React.createElement('button', { className: 'walk-action-btn center', onClick: () => { fitMapToScreen(); } }, 'Center')
+                                    )
+                                )
                             ) 
                             : React.createElement('div', { className: 'upload-area' },
                                 isLoading ? React.createElement(LoadingScreen, null) :
